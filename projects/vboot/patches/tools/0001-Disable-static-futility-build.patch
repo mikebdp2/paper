@@ -1,0 +1,40 @@
+From 8c6efe5f6d5d548291506f2f44109947a1a167f2 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 9 Jun 2018 22:20:47 +0200
+Subject: [PATCH] Disable static futility build
+
+Change-Id: I7f38eba86d3e90550ed29cbe4e70cf610f1d322a
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 53f76306..e8b1024d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1123,7 +1123,7 @@ signing_install: ${SIGNING_SCRIPTS} ${SIGNING_SCRIPTS_DEV} ${SIGNING_COMMON}
+ # new Firmware Utility
+ 
+ .PHONY: futil
+-futil: ${FUTIL_STATIC_BIN} ${FUTIL_BIN}
++futil: ${FUTIL_BIN}
+ 
+ ${FUTIL_STATIC_BIN}: LDLIBS += ${CRYPTO_STATIC_LIBS} -lpthread
+ ${FUTIL_STATIC_BIN}: ${FUTIL_STATIC_OBJS} ${UTILLIB}
+@@ -1136,10 +1136,10 @@ ${FUTIL_BIN}: ${FUTIL_OBJS} ${UTILLIB} ${FWLIB20} ${UTILBDB}
+ 	${Q}${LD} -o $@ ${CFLAGS} ${LDFLAGS} $^ ${LDLIBS}
+ 
+ .PHONY: futil_install
+-futil_install: ${FUTIL_BIN} ${FUTIL_STATIC_BIN}
++futil_install: ${FUTIL_BIN}
+ 	@${PRINTF} "    INSTALL       futility\n"
+ 	${Q}mkdir -p ${UB_DIR}
+-	${Q}${INSTALL} -t ${UB_DIR} ${FUTIL_BIN} ${FUTIL_STATIC_BIN}
++	${Q}${INSTALL} -t ${UB_DIR} ${FUTIL_BIN}
+ 	${Q}for prog in ${FUTIL_SYMLINKS}; do \
+ 		ln -sf futility "${UB_DIR}/$$prog"; done
+ 
+-- 
+2.17.1
+

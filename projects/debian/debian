@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Copyright (C) 2016 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+arguments() {
+	project_arguments_targets "$project" "$@"
+}
+
+usage() {
+	project_usage_actions "$project"
+	project_usage_arguments "$project" "$@"
+}
+
+install() {
+	local install_path=$( project_install_path "$project" "$@" )
+	local packages=$( debian_packages "$@" )
+	local arch=$( debian_arch_match )
+
+	requirements_root "debootstrap"
+
+	if ! debian_host_check
+	then
+		printf "Host is not running Debian, aborting!" >&2
+		return 1
+	fi
+
+	if [ -z "$arch" ]
+	then
+		printf "Unsupported arch, aborting!" >&2
+		return 1
+	fi
+
+	mkdir -p "$install_path"
+
+	if [ -n "$packages" ]
+	then
+		execute_root debootstrap --include="$packages" stable "$install_path" "https://deb.debian.org/debian/"
+	else
+		execute_root debootstrap stable "$install_path" "https://deb.debian.org/debian/"
+	fi
+
+	# Set empty root password.
+	execute_root sed "s/^root:\*:/root::/g" -i "$install_path/etc/shadow"
+
+	# Set hostname.
+	execute_root chmod 666 "$install_path/etc/hostname"
+	echo "$project" > "$install_path/etc/hostname"
+	execute_root chmod 644 "$install_path/etc/hostname"
+	execute_root sed "s/\tlocalhost/\tlocalhost $project/g" -i "$install_path/etc/hosts"
+
+	execute_root chown $USER:$USER "$install_path"
+}
+
+install_check() {
+	local install_path=$( project_install_path "$project" "$@" )
+
+	directory_filled_check "$install_path"
+}
+
+release() {
+	project_release_install_rootfs "$project" "$SYSTEMS" "$@"
+}
+
+release_check() {
+	project_release_install_rootfs_check "$project" "$SYSTEMS" "$@"
+}
+
+clean() {
+	project_clean_rootfs "$project" "$@"
+}

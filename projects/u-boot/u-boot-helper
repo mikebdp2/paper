@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2017 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+BOOTCMD_INSTALL="bootcmd-install"
+PLATFORM="platform"
+PADDING="padding"
+BOOTCMD="bootcmd"
+CONFIG="config"
+ARCH="arch"
+
+u_boot_arch() {
+	project_file_contents "$project" "$CONFIGS" "$ARCH" "$@"
+}
+
+u_boot_config() {
+	project_file_contents "$project" "$CONFIGS" "$CONFIG" "$@"
+}
+
+u_boot_bootcmd_install() {
+	project_file_contents_eval "$project" "$CONFIGS" "$BOOTCMD_INSTALL" "$@"
+}
+
+u_boot_padding() {
+	project_file_contents "$project" "$CONFIGS" "$PADDING" "$@"
+}
+
+u_boot_platform() {
+	project_file_contents "$project" "$CONFIGS" "$PLATFORM" "$@"
+}
+
+u_boot_install() {
+	local build_path=$( project_build_path "$project" "$@" )
+
+	local platform=$( u_boot_platform "$@" )
+	local padding=$( u_boot_padding "$@" )
+
+	local arch=$( u_boot_arch "$@" )
+
+	local crossgcc_bin_prefix=$( project_action "prefix" "crossgcc" "$arch" )
+
+	local image_size
+	local bootcmd
+
+	case $platform in
+	"tegra")
+		(
+			cd "$build_path"
+
+			image_size=$( printf "0x%x" "$( stat --printf="%s" "u-boot-tegra.bin" )" )
+
+			# Reserve 64 blocks for the BCT.
+			image_size=$( printf "0x%x" "$(( $image_size + 64 * 512 ))" )
+
+			if (( $padding < $image_size ))
+			then
+				printf "Not enough padding for image with size $image_size\n" >&2
+				return 1
+			fi
+
+			spl_text_base=$( grep "define CONFIG_SPL_TEXT_BASE" "u-boot.cfg" | sed "s/[^ ]* //g" )
+
+			image_address=$( printf "0x%x" "$(( $spl_text_base + $padding ))" )
+			read_address=$( printf "0x%x" "$(( $spl_text_base + $padding + $padding ))" )
+
+			if (( $image_size % 512 == 0 ))
+			then
+				image_sectors=$( printf "0x%x" "$(( $image_size / 512 ))" )
+			else
+				image_sectors=$( printf "0x%x" "$(( $image_size / 512 + 1 ))" )
+			fi
+
+			bootcmd=$( u_boot_bootcmd_install "$@" | tr '\n' ' ' )
+
+			cp "dts/dt.dtb" "dts/dt-install.dtb"
+
+			# Remove boot delay.
+			fdtput -p -t x "dts/dt-install.dtb" "/config" "bootdelay" "0xfffffffe"
+
+			fdtput -p -t s "dts/dt-install.dtb" "/config" "bootcmd" "$bootcmd"
+
+			cat "u-boot-nodtb-tegra.bin" "dts/dt-install.dtb" > "u-boot-dtb-install.bin"
+
+			"$crossgcc_bin_prefix""objcopy" -I binary -O binary --pad-to="$padding" --gap-fill="0xff" "u-boot-dtb-install.bin" "u-boot-tegra-install-padded.bin"
+
+			cp "u-boot-tegra-install-padded.bin" "u-boot-tegra-install.bin"
+
+			echo "$bootcmd" > "$build_path/$BOOTCMD_INSTALL"
+			echo "$spl_text_base" > "$build_path/loadaddr"
+		)
+		;;
+	"imx6")
+		(
+			cd "$build_path"
+
+			dd if="SPL" of="u-boot-imx6.bin" bs="512" seek="0"
+			dd if="u-boot.img" of="u-boot-imx6.bin" bs="512" seek="136"
+		)
+		;;
+	esac
+}

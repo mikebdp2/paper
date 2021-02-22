@@ -1,0 +1,80 @@
+From 70fe2bd6bd0b8d7771096b2c1be09649cf65986b Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 2 Jun 2018 21:55:08 +0200
+Subject: [PATCH 1/3] Revert "rockchip: include hdcp.bin and declare hdcp key
+ decryption handler"
+
+This reverts commit c76631c52b0b1550ff182c177555485700274314.
+
+Change-Id: I469b5b13c545e23491f77ddc5574b4966dc70c4f
+---
+ plat/rockchip/rk3399/drivers/dp/hdcp.bin | Bin 864 -> 0 bytes
+ plat/rockchip/rk3399/platform.mk         |  10 +---------
+ 2 files changed, 1 insertion(+), 9 deletions(-)
+ delete mode 100644 plat/rockchip/rk3399/drivers/dp/hdcp.bin
+
+diff --git a/plat/rockchip/rk3399/drivers/dp/hdcp.bin b/plat/rockchip/rk3399/drivers/dp/hdcp.bin
+deleted file mode 100644
+index 28db923669fe63812c25f016753df10558334fee..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 864
+zcmYjPOH30{6g@L<I&Cc?LKBISv>l2;;=)Bu-b5CqMNDwlcHag<GJ%z{G7z1HnrPTK
+z(ZnTHf~L4|%?gnOHPJ*c8kYs*Cw4;x7MRF*9<p%pa&yl;=iYPQd%kF0*WqsXS*&l0
+zuy-J^FPssXbrLdTz$>N$&9d(o>REW*hMTkQWNsMb3&0+2adX0ey{a*Wn4e&5ft?j@
+zyJ&;mt?E(OBFNZD9K^d|e>uiH4tqYpm?W>2v6r~gohPp97l<EcOi?!-%Ip2?BgvUD
+zJmvQ+^w}{Ov#;I{+9v&egE{=fv5q{WsnK&K4Q~!cvwYwel%_rdFXP1jafm-6N8#Kj
+zr+SR>RA5Fb2t+DfXumz3z8`ePWbml3>Ga5=(y?DM4)2_6c;AJw7*KkiH3KKtsC!MF
+z?l^J*dSrq5BJ+qdE+bB_)SW&VVolfd$Pc9LOc(Mx=Q1DOibDDbH&*`mg*fltYJ+!$
+z9CN!UgWEAVv>TH#=nb%zrS~n)c02h-K;tD)Fv-2lGsHdta)0~&Del2L2sf1H_*=uX
+z=s7^npyHBekf-#c><8Y3<&@+I??}yvMREA{3Qq#FBRq$A$!J#M?7_Dkpsvi_A9uUC
+zI%5y;;6SAJ`JX&rw0bW@@sn`w=D<B?!qw}haC4gGZfKvEe<hG!D(gs%8o0Je|NrAF
+z8d6pMmo^}3)h~VA5>{W5@vBJo4Z?^FAaHdV`b6Sh<#b}&Jd^PK)KBiK>Hm7ifhGFR
+zsrmjY)_3x#75b5{KZU(FrPbV<q5Pf@i<|SXJJjEJ27C88?D{;s(s)UJ@coBX4HqX(
+sc(>ZoRC_AkoZd0<j$W(dlTy{*kXPbtoj%pPoqW2sH#Jb>%){OP0&Y4QX8-^I
+
+diff --git a/plat/rockchip/rk3399/platform.mk b/plat/rockchip/rk3399/platform.mk
+index 1997dfc4..9906db11 100644
+--- a/plat/rockchip/rk3399/platform.mk
++++ b/plat/rockchip/rk3399/platform.mk
+@@ -18,7 +18,6 @@ PLAT_INCLUDES		:=	-I${RK_PLAT_COMMON}/			\
+ 				-I${RK_PLAT_SOC}/drivers/secure/	\
+ 				-I${RK_PLAT_SOC}/drivers/soc/		\
+ 				-I${RK_PLAT_SOC}/drivers/dram/		\
+-				-I${RK_PLAT_SOC}/drivers/dp/		\
+ 				-I${RK_PLAT_SOC}/include/		\
+ 				-I${RK_PLAT_SOC}/include/shared/	\
+ 
+@@ -52,7 +51,6 @@ BL31_SOURCES	+=	${RK_GIC_SOURCES}				\
+ 			${RK_PLAT_COMMON}/aarch64/platform_common.c	\
+ 			${RK_PLAT_COMMON}/rockchip_sip_svc.c		\
+ 			${RK_PLAT_SOC}/plat_sip_calls.c			\
+-			${RK_PLAT_SOC}/drivers/dp/cdn_dp.c		\
+ 			${RK_PLAT_SOC}/drivers/gpio/rk3399_gpio.c	\
+ 			${RK_PLAT_SOC}/drivers/pmu/pmu.c		\
+ 			${RK_PLAT_SOC}/drivers/pmu/pmu_fw.c		\
+@@ -82,18 +80,12 @@ BUILD_M0		:=	${BUILD_PLAT}/m0
+ RK3399M0FW=${BUILD_M0}/${PLAT_M0}.bin
+ $(eval $(call add_define,RK3399M0FW))
+ 
+-HDCPFW=${RK_PLAT_SOC}/drivers/dp/hdcp.bin
+-$(eval $(call add_define,HDCPFW))
+-
+ # CCACHE_EXTRAFILES is needed because ccache doesn't handle .incbin
+ export CCACHE_EXTRAFILES
+ ${BUILD_PLAT}/bl31/pmu_fw.o: CCACHE_EXTRAFILES=$(RK3399M0FW)
+ ${RK_PLAT_SOC}/drivers/pmu/pmu_fw.c: $(RK3399M0FW)
+ 
+-${BUILD_PLAT}/bl31/cdn_dp.o: CCACHE_EXTRAFILES=$(HDCPFW)
+-${RK_PLAT_SOC}/drivers/dp/cdn_dp.c: $(HDCPFW)
+-
+-$(eval $(call MAKE_PREREQ_DIR,${BUILD_M0},${BUILD_PLAT}))
++$(eval $(call MAKE_PREREQ_DIR,${BUILD_M0},))
+ .PHONY: $(RK3399M0FW)
+ $(RK3399M0FW): | ${BUILD_M0}
+ 	$(MAKE) -C ${RK_PLAT_SOC}/drivers/m0 BUILD=$(abspath ${BUILD_PLAT}/m0)
+-- 
+2.17.1
+

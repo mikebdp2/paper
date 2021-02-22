@@ -1,0 +1,5 @@
+coreboot
+vboot devices
+arm-trusted-firmware
+libpayload
+depthcharge

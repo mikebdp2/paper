@@ -1,0 +1,27 @@
+From ae6803c08dcadd5f7f283239ecc3e59330e3fe74 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 20:25:08 +0200
+Subject: [PATCH 2/2] Whitelist string-related warnings for building with GCC 8
+
+Change-Id: I3872cbdaa960cbb9eb6f16bf82bf2bae76cbe959
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ Makefile.toolchain | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile.toolchain b/Makefile.toolchain
+index 202956d4e..aae64f908 100644
+--- a/Makefile.toolchain
++++ b/Makefile.toolchain
+@@ -35,7 +35,7 @@ HOSTCXX?=$(CCACHE) $(HOST_CROSS_COMPILE)g++
+ C_WARN = -Wstrict-prototypes -Wdeclaration-after-statement -Wno-pointer-sign
+ COMMON_WARN = -Wall -Werror -Wundef -Wno-trigraphs -fno-strict-aliasing \
+ 	-fno-common -Werror-implicit-function-declaration \
+-	-Wno-format-security -fno-strict-overflow
++	-Wno-format-security -fno-strict-overflow -Wno-stringop-truncation -Wno-format-overflow -Wno-stringop-overflow
+ CFLAGS_WARN = $(COMMON_WARN) $(C_WARN)
+ CXXFLAGS_WARN = $(COMMON_WARN)
+ CFLAGS_DEBUG= -g
+-- 
+2.17.1
+

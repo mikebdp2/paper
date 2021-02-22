@@ -1,0 +1,7 @@
+arch/arm/boot/dts/sun7i-a20-bananapi.dtb:sun7i-a20-bananapi.dtb
+arch/arm/boot/dts/sun7i-a20-cubieboard2.dtb:sun7i-a20-cubieboard2.dtb
+arch/arm/boot/dts/sun7i-a20-lamobo-r1.dtb:sun7i-a20-lamobo-r1.dtb
+arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dtb:sun7i-a20-olinuxino-lime2.dtb
+arch/arm/boot/dts/sun8i-h3-nanopi-neo.dtb:sun8i-h3-nanopi-neo.dtb
+arch/arm/boot/dts/sun8i-h3-orangepi-one.dtb:sun8i-h3-orangepi-one.dtb
+arch/arm/boot/zImage:zImage

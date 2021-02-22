@@ -1,0 +1,680 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+SYS_BLOCK_PATH="/sys/class/block"
+DEV_PATH="/dev"
+BOOT="boot"
+TYPE="type"
+KERNEL="kernel"
+CMDLINE="cmdline"
+DEVICE_TREE="device-tree"
+EXTLINUX="extlinux"
+CONF="conf"
+IMG="img"
+BIN="bin"
+ITS="its"
+KERNEL_MODULES="modules/lib"
+BLOCK_SIZE=512
+
+usage_variables_flasher() {
+	printf "  FLASHER - External flasher to use for installation\n" >&2
+}
+
+usage_media_common() {
+	printf "\nMedia:\n" >&2
+
+	while [ -n "$1" ]
+	do
+		case $1 in
+		"usb")
+			printf "  usb - External USB storage\n" >&2
+			;;
+		"mmc")
+			printf "  mmc - External SD card storage\n" >&2
+			;;
+		"emmc")
+			printf "  emmc - Internal eMMC storage\n" >&2
+			;;
+		esac
+
+		if [ -z "$2" ]
+		then
+			break
+		else
+			shift
+		fi
+	done
+}
+
+usage_variables_storage() {
+	printf "  CONFIRM - Enable automatic storage confirmation (careful!)\n" >&2
+}
+
+usage_variables_partitions() {
+	printf "  DISABLE_JOURNAL - Disable filesystem journalization\n" >&2
+}
+
+usage_storage_common() {
+	printf "\nStorage:\n" >&2
+
+	local nodes=$( ls "$SYS_BLOCK_PATH" )
+	local node_path
+	local name
+
+	for node in $nodes
+	do
+		node_path="$DEV_PATH/$node"
+		if ! [ -b "$node_path" ]
+		then
+			continue
+		fi
+
+		name=$( storage_name "$node_path" )
+		if [ -z "$name" ]
+		then
+			continue
+		fi
+
+		printf "  $node_path - $name\n" >&2
+	done
+}
+
+path_overwrite_confirm() {
+	local file_path=$1
+
+	local confirm
+
+	if ! [ -f "$file_path" ] && ! [ -d "$file_path" ]
+	then
+		return
+	fi
+
+	printf "This is going to overwrite the following path:\n"
+	printf "  $file_path\n"
+	printf "Press enter to confirm: "
+
+	if [ -n "$CONFIRM" ]
+	then
+		return
+	fi
+
+	read confirm
+}
+
+storage_affect_confirm() {
+	local storage_path=$1
+
+	local name
+	local confirm
+
+	if ! [ -b "$storage_path" ]
+	then
+		printf "Invalid storage path: $storage_path\n" >&2
+		return 1
+	fi
+
+	name=$( storage_name "$storage_path" )
+
+	printf "This is going to affect the following storage:\n"
+	printf "  $storage_path - $name\n"
+	printf "Press enter to confirm: "
+
+	if [ -n "$CONFIRM" ]
+	then
+		printf "\n"
+		return
+	fi
+
+	read confirm
+}
+
+storage_name() {
+	local storage_path=$1
+
+	local node=$( basename "$storage_path" )
+	local vendor_path="$SYS_BLOCK_PATH/$node/device/vendor"
+	local model_path="$SYS_BLOCK_PATH/$node/device/model"
+	local name_path="$SYS_BLOCK_PATH/$node/device/name"
+	local vendor
+	local name
+
+	if [ -f "$model_path" ]
+	then
+		name=$( cat "$model_path" )
+	elif [ -f "$name_path" ]
+	then
+		name=$( cat "$name_path" )
+	else
+		return 0
+	fi
+
+	name=$( echo "$name" | sed -e "s/^[[:space:]]*//;s/[[:space:]]*$//" )
+
+	if [ -f "$vendor_path" ]
+	then
+		vendor=$( cat "$vendor_path" )
+		vendor=$( echo "$vendor" | sed -e "s/^[[:space:]]*//;s/[[:space:]]*$//" )
+
+		name="$vendor $name"
+	fi
+
+	echo "$name"
+}
+
+storage_partition_path() {
+	local storage_path=$1
+	local index=$2
+
+	storage_partition_path="$storage_path$index"
+
+	if ! [ -b "$storage_partition_path" ]
+	then
+		storage_partition_path="$storage_path""p$index"
+	fi
+
+	if ! [ -b "$storage_partition_path" ]
+	then
+		return 1
+	fi
+
+	echo "$storage_partition_path"
+}
+
+requirements() {
+	local requirement
+	local requirement_path
+
+	for requirement in "$@"
+	do
+		requirement_path=$( which "$requirement" || true )
+
+		if [ -z "$requirement_path" ]
+		then
+			printf "Missing requirement: $requirement\n" >&2
+			return 1
+		fi
+	done
+}
+
+partitions_requirements_common() {
+	requirements "udisksctl" "fdisk" "mkfs.ext4"
+}
+
+partitions_unmount() {
+	local storage_path=$1
+
+	local partitions=$( mount | grep -P "^$storage_path" | sed "s/^\([^[:space:]]*\).*/\1/g" )
+	local partition
+
+	for partition in $partitions
+	do
+		# Partition may already be unmounted.
+		udisksctl unmount -b "$partition" || true
+	done
+}
+
+partitions_create_table() {
+	local storage_path=$1
+	shift
+	local arguments=("$@")
+
+	local argument
+
+	wipefs -a "$storage_path"
+
+	(
+		for argument in "${arguments[@]}"
+		do
+			echo "$argument"
+		done
+	) | fdisk "$storage_path"
+
+	sync
+
+	blockdev --rereadpt "$storage_path" || partprobe "$storage_path"
+}
+
+partition_mount() {
+	local storage_partition_path=$1
+
+	# Partition may already be mounted.
+	udisksctl mount -b "$storage_partition_path" || true
+}
+
+partition_mount_path() {
+	local storage_partition_path=$1
+
+	local partition_mount_path=$( udisksctl info -b "$storage_partition_path" | grep "MountPoints" | sed "s/.*MountPoints:[[:space:]]*\(.*\)/\1/g" )
+
+	echo "$partition_mount_path"
+}
+
+partition_unmount() {
+	local storage_partition_path=$1
+
+	udisksctl unmount -b "$storage_partition_path"
+}
+
+partition_create_ext4() {
+	local storage_partition_path=$1
+	local flags=$2
+
+	local flags_cmdline=""
+
+	if [ -n "$flags" ]
+	then
+		flags_cmdline="-O $flags"
+	fi
+
+	mkfs.ext4 $flags_cmdline -F "$storage_partition_path"
+
+	if [ -n "$DISABLE_JOURNAL" ]
+	then
+		tune2fs -O "^has_journal" "$storage_partition_path"
+	fi
+
+	sync
+}
+
+boot_image_file() {
+	local boot_files_path=$1
+	local suffix_match=$2
+
+	local boot_image=$( ls "$boot_files_path" | grep -P "\-$suffix_match$" | head -n 1 )
+
+	if [ -z "$boot_image" ]
+	then
+		printf "No boot image found in $boot_files_path\n" >&2
+		return 1
+	fi
+
+	echo "$boot_image"
+}
+
+kernel_requirements_install() {
+	requirements "udisksctl" "rsync"
+}
+
+kernel_requirements_fit() {
+	requirements "mkimage"
+}
+
+kernel_prepare_summary() {
+	local kernel_files_path=$1
+	local type=$2
+
+	printf "Configuration summary:\n"
+	printf "  Kernel files path: $kernel_files_path\n"
+	printf "  Type: $type\n"
+}
+
+kernel_prepare_fit() {
+	local kernel_files_path=$1
+
+	local kernel_its_path="$kernel_files_path/$KERNEL.$ITS"
+	local kernel_image_path="$kernel_files_path/$KERNEL.$IMG"
+	local kernel_path="$kernel_files_path/$KERNEL"
+	local device_tree_path="$kernel_files_path/$DEVICE_TREE"
+	local kernel
+	local device_tree
+	local dt
+	local dt_description
+	local i
+
+	kernel_prepare_summary "$kernel_files_path" "fit"
+	printf "\n"
+
+	kernel=$( cat "$kernel_path" )
+	device_tree=$( cat "$device_tree_path" )
+
+	if ! [ -f "$kernel_files_path/$kernel" ]
+	then
+		kernel="../$kernel"
+	fi
+
+	cat <<EOS > "$kernel_its_path"
+/dts-v1/;
+
+/ {
+	description = "kernel";
+	#address-cells = <1>;
+
+	images {
+		kernel@1{
+			description = "kernel";
+			data = /incbin/("$kernel");
+			type = "kernel_noload";
+			arch = "arm";
+			os = "linux";
+			compression = "none";
+			load = <0>;
+			entry = <0>;
+		};
+EOS
+	i=1
+	IFS=$'\n'
+
+	for dt in $device_tree
+	do
+		if ! [ -f "$kernel_files_path/$dt" ]
+		then
+			dt="../$dt"
+		fi
+
+		dt_description=$( basename "$dt" )
+
+		cat <<EOS >> "$kernel_its_path"
+
+		fdt@$i{
+			description = "$dt_description device-tree";
+			data = /incbin/("$dt");
+			type = "flat_dt";
+			arch = "arm";
+			compression = "none";
+			hash@1{
+				algo = "sha1";
+			};
+		};
+EOS
+
+		i=$(( $i + 1 ))
+	done
+
+	cat <<EOS >> "$kernel_its_path"
+	};
+
+	configurations {
+		default = "conf@1";
+EOS
+
+	i=1
+
+	for dt in $device_tree
+	do
+
+
+cat <<EOS >> "$kernel_its_path"
+
+		conf@$i{
+			kernel = "kernel@1";
+			fdt = "fdt@$i";
+		};
+EOS
+
+		i=$(( $i + 1 ))
+	done
+
+	unset IFS
+
+	cat <<EOS >> "$kernel_its_path"
+	};
+};
+EOS
+
+	mkimage -f "$kernel_its_path" "$kernel_image_path"
+
+	printf "\nFIT kernel image preparation completed\n"
+}
+
+kernel_prepare_append() {
+	local kernel_files_path=$1
+
+	local kernel_image_path="$kernel_files_path/$KERNEL.$IMG"
+	local kernel_path="$kernel_files_path/$KERNEL"
+	local device_tree_path="$kernel_files_path/$DEVICE_TREE"
+	local kernel
+	local device_tree
+	local i
+
+	kernel_prepare_summary "$kernel_files_path" "append"
+
+	kernel=$( cat "$kernel_path" )
+	device_tree=$( cat "$device_tree_path" )
+
+	if ! [ -f "$kernel_files_path/$kernel" ]
+	then
+		kernel="../$kernel"
+	fi
+
+	cat "$kernel_files_path/$kernel" > "$kernel_image_path"
+
+	IFS=$'\n'
+
+	for dt in $device_tree
+	do
+		if ! [ -f "$kernel_files_path/$dt" ]
+		then
+			dt="../$dt"
+		fi
+
+		cat "$kernel_files_path/$dt" >> "$kernel_image_path"
+	done
+
+	unset IFS
+
+	printf "\nAppended kernel image preparation completed\n"
+}
+
+kernel_prepare_extlinux() {
+	local kernel_files_path=$1
+	local rootfs_medium=$2
+
+	local extlinux_conf_path="$kernel_files_path/$EXTLINUX-$rootfs_medium.$CONF"
+	local kernel_path="$kernel_files_path/$KERNEL"
+	local device_tree_path="$kernel_files_path/$DEVICE_TREE"
+	local cmdline_path="$kernel_files_path/$CMDLINE-$rootfs_medium"
+	local kernel
+	local device_tree
+	local cmdline
+
+	kernel_prepare_summary "$kernel_files_path" "extlinux"
+
+	kernel=$( cat "$kernel_path" )
+	device_tree=$( cat "$device_tree_path" )
+	cmdline=$( cat "$cmdline_path" )
+
+	cat <<EOS > "$extlinux_conf_path"
+label kernel-$rootfs_medium
+	kernel /$BOOT/$kernel
+	fdt /$BOOT/$device_tree
+	append $cmdline
+EOS
+
+	printf "\nExtlinux kernel configuration preparation completed\n"
+}
+
+kernel_install_summary() {
+	local storage_path=$1
+	local kernel_files_path=$2
+	local rootfs_medium=$3
+	local storage_rootfs_path=$4
+
+	printf "Configuration summary:\n"
+	printf "  Storage path: $storage_path\n"
+	printf "  Kernel files path: $kernel_files_path\n"
+	printf "  Rootfs medium: $rootfs_medium\n"
+	printf "  Storage rootfs path: $storage_rootfs_path\n\n"
+}
+
+kernel_install_extlinux() {
+	local storage_path=$1
+	local kernel_files_path=$2
+	local rootfs_medium=$3
+	local rootfs_partition_index=$4
+
+	local storage_rootfs_path=$( storage_partition_path "$storage_path" "$rootfs_partition_index" )
+	local rootfs_mount_path
+
+	kernel_install_summary "$storage_path" "$kernel_files_path" "$rootfs_medium" "$storage_rootfs_path"
+
+	storage_affect_confirm "$storage_path"
+
+	partition_mount "$storage_rootfs_path"
+
+	rootfs_mount_path=$( partition_mount_path "$storage_rootfs_path" )
+
+	kernel_install_kernel_file "$kernel_files_path" "$rootfs_mount_path"
+	kernel_install_modules "$kernel_files_path" "$rootfs_mount_path"
+
+	kernel_install_extlinux_conf "$kernel_files_path" "$rootfs_medium" "$rootfs_mount_path"
+
+	partition_unmount "$storage_rootfs_path"
+
+	sync
+
+	printf "\nKernel installation completed\n"
+}
+
+kernel_install_extlinux_conf() {
+	local kernel_files_path=$1
+	local rootfs_medium=$2
+	local rootfs_mount_path=$3
+
+	local extlinux_conf_path="$kernel_files_path/$EXTLINUX-$rootfs_medium.$CONF"
+
+	mkdir -p "$rootfs_mount_path/$BOOT/$EXTLINUX"
+
+	cp "$extlinux_conf_path" "$rootfs_mount_path/$BOOT/$EXTLINUX/$EXTLINUX.$CONF"
+
+	sync
+}
+
+kernel_install_partition() {
+	local storage_path=$1
+	local kernel_files_path=$2
+	local rootfs_medium=$3
+	local kernel_partition_index=$4
+	local rootfs_partition_index=$5
+
+	local storage_kernel_path=$( storage_partition_path "$storage_path" "$kernel_partition_index" )
+	local storage_rootfs_path=$( storage_partition_path "$storage_path" "$rootfs_partition_index" )
+	local kernel_image_path="$kernel_files_path/$KERNEL-$rootfs_medium.$IMG"
+	local rootfs_mount_path
+
+	kernel_install_summary "$storage_path" "$kernel_files_path" "$rootfs_medium" "$storage_rootfs_path"
+
+	storage_affect_confirm "$storage_path"
+
+	kernel_install_kernel_partition "$kernel_image_path" "$storage_kernel_path"
+
+	partition_mount "$storage_rootfs_path"
+
+	rootfs_mount_path=$( partition_mount_path "$storage_rootfs_path" )
+
+	kernel_install_modules "$kernel_files_path" "$rootfs_mount_path"
+
+	partition_unmount "$storage_rootfs_path"
+
+	sync
+
+	printf "\nKernel installation completed\n"
+}
+
+kernel_install_kernel_file() {
+	local kernel_files_path=$1
+	local storage_rootfs_mount_path=$2
+
+	local kernel_path="$kernel_files_path/$KERNEL"
+	local device_tree_path="$kernel_files_path/$DEVICE_TREE"
+	local kernel
+	local device_tree
+
+	kernel=$( cat "$kernel_path" )
+
+	if ! [ -f "$kernel_files_path/$kernel" ]
+	then
+		kernel="../$kernel"
+	fi
+
+	device_tree=$( cat "$device_tree_path" )
+
+	mkdir -p "$rootfs_mount_path/$BOOT"
+
+	cp "$kernel_files_path/$kernel" "$rootfs_mount_path/$BOOT/"
+
+	IFS=$'\n'
+
+	for dt in $device_tree
+	do
+		if ! [ -f "$kernel_files_path/$dt" ]
+		then
+			dt="../$dt"
+		fi
+
+		cp "$kernel_files_path/$dt" "$rootfs_mount_path/$BOOT/"
+	done
+
+	unset IFS
+}
+
+kernel_install_kernel_partition() {
+	local kernel_image_path=$1
+	local storage_kernel_path=$2
+
+	cat "$kernel_image_path" > "$storage_kernel_path"
+}
+
+kernel_install_modules() {
+	local kernel_files_path=$1
+	local storage_rootfs_mount_path=$2
+
+	local modules_path="$kernel_files_path/$KERNEL_MODULES"
+
+	if ! [ -d "$modules_path" ]
+	then
+		modules_path="$kernel_files_path/../$KERNEL_MODULES"
+	fi
+
+	rsync -a --keep-dirlinks "$modules_path" "$storage_rootfs_mount_path/"
+}
+
+rootfs_requirements_common() {
+	requirements "udisksctl" "tar"
+}
+
+rootfs_extract() {
+	local storage_mount_path=$1
+	local rootfs_tarball_path=$2
+
+	tar -xf "$rootfs_tarball_path" -ps -C "$storage_mount_path"
+}
+
+rootfs_install_common() {
+	local storage_path=$1
+	local rootfs_tarball_path=$2
+	local rootfs_partition_index=$3
+
+	local storage_rootfs_path=$( storage_partition_path "$storage_path" "$rootfs_partition_index" )
+	local rootfs_mount_path
+
+	printf "Configuration summary:\n"
+	printf "  Storage path: $storage_path\n"
+	printf "  Tarball path: $rootfs_tarball_path\n"
+	printf "  Storage rootfs path: $storage_rootfs_path\n\n"
+
+	storage_affect_confirm "$storage_path"
+
+	partition_mount "$storage_rootfs_path"
+
+	rootfs_mount_path=$( partition_mount_path "$storage_rootfs_path" )
+
+	rootfs_extract "$rootfs_mount_path" "$rootfs_tarball_path"
+
+	partition_unmount "$storage_rootfs_path"
+
+	printf "\nRootfs installation completed\n"
+}

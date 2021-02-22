@@ -1,0 +1,5 @@
+coreboot default
+crossgcc default
+linux
+linux-cros
+linux-firmware

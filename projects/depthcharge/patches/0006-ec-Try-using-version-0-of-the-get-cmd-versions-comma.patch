@@ -1,0 +1,60 @@
+From 99166aef68ad80acdd96d92a26259dade804336d Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 5 Aug 2018 21:46:52 +0200
+Subject: [PATCH 6/6] ec: Try using version 0 of the get cmd versions command
+ when v1 fails
+
+The current implementation only tries the latest verison of the
+get cmd versions command, although version 1 fails for old devices
+that are still supported in mainline depthcharge. Since these devices
+are no longer supported by mainline cros-ec, they live with old versions
+of the cros-ec protocol.
+
+In this case, using version 0 as a fallback when version 1 fails works
+well to bring back EC sync. Without this patch, devices attempting to
+update the EC RW image will fail to get the version of the protocol
+needed to determine the proper block size to use.
+
+Change-Id: Id81b02421bd2f8965d9098dfe6da724d3566277c
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ src/drivers/ec/cros/ec.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/src/drivers/ec/cros/ec.c b/src/drivers/ec/cros/ec.c
+index b382097f..47293f69 100644
+--- a/src/drivers/ec/cros/ec.c
++++ b/src/drivers/ec/cros/ec.c
+@@ -364,15 +364,25 @@ static CrosEc *get_main_ec(void)
+  */
+ static int get_cmd_versions(CrosEc *me, int cmd, uint32_t *pmask)
+ {
+-	struct ec_params_get_cmd_versions_v1 p;
++	struct ec_params_get_cmd_versions_v1 p_v1;
++	struct ec_params_get_cmd_versions p;
+ 	struct ec_response_get_cmd_versions r;
++	int ret;
+ 
+ 	*pmask = 0;
+ 
+-	p.cmd = cmd;
++	p_v1.cmd = cmd;
++
++	ret = ec_command(me, EC_CMD_GET_CMD_VERSIONS,
++			 1, &p_v1, sizeof(p_v1), &r, sizeof(r));
++	if (ret != sizeof(r)) {
++		p.cmd = cmd;
++
++		ret = ec_command(me, EC_CMD_GET_CMD_VERSIONS,
++				 0, &p, sizeof(p), &r, sizeof(r));
++	}
+ 
+-	if (ec_command(me, EC_CMD_GET_CMD_VERSIONS,
+-		       1, &p, sizeof(p), &r, sizeof(r)) != sizeof(r))
++	if(ret != sizeof(r))
+ 		return -1;
+ 
+ 	*pmask = r.version_mask;
+-- 
+2.18.0
+

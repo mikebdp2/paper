@@ -1,0 +1,4 @@
+arch/arm64/boot/dts/mediatek/mt8173-elm-rev0.dtb:mt8173-elm-rev0.dtb
+arch/arm64/boot/dts/mediatek/mt8173-elm-rev1.dtb:mt8173-elm-rev1.dtb
+arch/arm64/boot/dts/mediatek/mt8173-elm-rev3.dtb:mt8173-elm-rev3.dtb
+arch/arm64/boot/Image:Image

@@ -1,0 +1,3 @@
+coreboot default
+crossgcc default
+cros-ec

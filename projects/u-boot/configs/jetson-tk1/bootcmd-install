@@ -1,0 +1,15 @@
+crc32 $image_address $image_size 0x80000000 ;
+
+mmc dev 0 1 ;
+mmc write $image_address 0 $image_sectors ;
+mmc read $read_address 0 $image_sectors ;
+
+crc32 $read_address $image_size 0x80000004 ;
+if itest.l *0x80000000 != *0x80000004 ; then echo "Invalid read U-Boot image CRC" ; exit ; else echo "Installed U-Boot image to eMMC" ; fi ;
+
+env default -f -a ;
+saveenv ;
+
+mmc rescan ;
+
+reset ;

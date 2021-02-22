@@ -1,0 +1,49 @@
+From 119335c6dc0a04483d26430c0d3f2822452a7b0c Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 4 Mar 2018 22:04:43 +0100
+Subject: [PATCH 1/2] Initialize maybe unitialized variables
+
+Change-Id: I32a7b70289d962ccd7a4d7d291ce64f702de1b87
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ board/kevin/board.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/board/kevin/board.c b/board/kevin/board.c
+index fb980988b..67c64c0c8 100644
+--- a/board/kevin/board.c
++++ b/board/kevin/board.c
+@@ -203,7 +203,7 @@ uint16_t tcpc_get_alert_status(void)
+ 
+ int board_set_active_charge_port(int charge_port)
+ {
+-	enum bd99955_charge_port bd99955_port;
++	enum bd99955_charge_port bd99955_port = BD99955_CHARGE_PORT_NONE;
+ 	static int initialized;
+ 
+ 	/*
+@@ -230,11 +230,10 @@ int board_set_active_charge_port(int charge_port)
+ 		bd99955_port = bd99955_pd_port_to_chg_port(charge_port);
+ 		break;
+ 	case CHARGE_PORT_NONE:
+-		bd99955_port = BD99955_CHARGE_PORT_NONE;
+ 		break;
+ 	default:
+ 		panic("Invalid charge port\n");
+-		break;
++		return -1;
+ 	}
+ 
+ 	initialized = 1;
+@@ -285,7 +284,7 @@ int extpower_is_present(void)
+ 
+ int pd_snk_is_vbus_provided(int port)
+ {
+-	enum bd99955_charge_port bd99955_port;
++	enum bd99955_charge_port bd99955_port = BD99955_CHARGE_PORT_NONE;
+ 
+ 	switch (port) {
+ 	case 0:
+-- 
+2.17.1
+

@@ -1,0 +1,5 @@
+arch/arm/boot/dts/rk3288-mickey-rev0.dtb:rk3288-mickey-rev0.dtb
+arch/arm/boot/dts/rk3288-minnie-rev0.dtb:rk3288-minnie-rev0.dtb
+arch/arm/boot/dts/rk3288-speedy.dtb:rk3288-speedy.dtb
+arch/arm/boot/dts/rk3288-speedy-rev1.dtb:rk3288-speedy-rev1.dtb
+arch/arm/boot/zImage:zImage

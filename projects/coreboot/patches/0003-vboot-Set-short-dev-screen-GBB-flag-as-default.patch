@@ -1,0 +1,27 @@
+From 1617d977883fa3e890da095c7378578c306802d2 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 21:50:00 +0200
+Subject: [PATCH 3/3] vboot: Set short dev screen GBB flag as default
+
+Change-Id: I891520541c7492d6107efd050ef1ba6799e00ac7
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ src/security/vboot/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/security/vboot/Kconfig b/src/security/vboot/Kconfig
+index 0139d25599..dde18587df 100644
+--- a/src/security/vboot/Kconfig
++++ b/src/security/vboot/Kconfig
+@@ -250,7 +250,7 @@ config GBB_BMPFV_FILE
+ 
+ config GBB_FLAG_DEV_SCREEN_SHORT_DELAY
+ 	bool "Reduce dev screen delay"
+-	default n
++	default y
+ 
+ config GBB_FLAG_LOAD_OPTION_ROMS
+ 	bool "Load option ROMs"
+-- 
+2.17.1
+

@@ -1,0 +1,8 @@
+src/drivers/input/mkbp/layout/de.c
+src/drivers/input/mkbp/layout/us.c
+src/drivers/storage/mtd/nand/ipq_nand.c
+src/drivers/video/ww_ring_programs.c
+util/kconfig/zconf.hash.c_shipped
+util/kconfig/zconf.lex.c_shipped
+util/kconfig/zconf.tab.c_shipped
+src/drivers/ec/anx3429/anx3429.c

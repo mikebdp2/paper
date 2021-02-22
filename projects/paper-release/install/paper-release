@@ -1,0 +1,278 @@
+#!/bin/bash
+
+# Copyright (C) 2016 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+BUILD_SYSTEM="paper"
+
+SOURCES="sources"
+SYSTEMS="systems"
+IMAGES="images"
+TOOLS="tools"
+
+TAR_XZ="tar.xz"
+SHA256SUM="sha256sum"
+ASC="asc"
+
+usage() {
+	printf "$executable [action] [projects...]\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  download - Download project files\n" >&2
+	printf "  sources - Download project sources\n" >&2
+	printf "  verify - Verify project files\n" >&2
+	printf "  extract - Extract project files\n" >&2
+	printf "  prepare - Download, verify and extract project files\n" >&2
+
+	printf "\nEnvironment variables:\n" >&2
+	printf "  MACHINE - Machine architecture to use\n" >&2
+	printf "  DOWNLOAD_URL - Base URL to download files from\n" >&2
+}
+
+arguments_concat() {
+	local delimiter=$1
+	shift
+
+	local concat
+
+	for argument in "$@"
+	do
+		if ! [ -z "$concat" ]
+		then
+			concat="$concat""$delimiter""$argument"
+		else
+			concat="$argument"
+		fi
+	done
+
+	echo "$concat"
+}
+
+download() {
+	local project=$( arguments_concat "-" "$@" )
+
+	local prefix
+	local path
+	local url
+
+	for prefix in "$SYSTEMS/$MACHINE" "$IMAGES" "$TOOLS/$MACHINE"
+	do
+		path="$root/$prefix/$project.$TAR_XZ"
+		url="$DOWNLOAD_URL/$prefix/$project.$TAR_XZ"
+
+		if wget --quiet --spider "$url"
+		then
+			mkdir -p "$( dirname "$path" )"
+			wget -O "$path" "$url"
+			wget -O "$path.$SHA256SUM" "$url.$SHA256SUM"
+			wget -O "$path.$ASC" "$url.$ASC"
+
+			printf "\nDownloaded $project\n"
+
+			return 0
+		fi
+	done
+
+	printf "Could not download $project from $DOWNLOAD_URL\n" >&2
+	return 1
+}
+
+sources() {
+	local project=$1
+	shift
+
+	local url="$DOWNLOAD_URL/$SOURCES/$project.$TAR_XZ"
+	local path="$root/$SOURCES/$project.$TAR_XZ"
+	local prefix=$SOURCES
+
+	for target in "" "$@"
+	do
+		if [ -n "$target" ]
+		then
+			project="$project-$target"
+		fi
+
+		path="$root/$prefix/$project.$TAR_XZ"
+		url="$DOWNLOAD_URL/$prefix/$project.$TAR_XZ"
+
+		if wget --quiet --spider "$url"
+		then
+			mkdir -p "$( dirname "$path" )"
+			wget -O "$path" "$url"
+			wget -O "$path.$SHA256SUM" "$url.$SHA256SUM"
+			wget -O "$path.$ASC" "$url.$ASC"
+
+			printf "\nDownloaded $project sources\n"
+
+			return 0
+		fi
+	done
+
+	printf "Could not download $project sources from $DOWNLOAD_URL\n" >&2
+	return 1
+
+}
+
+verify() {
+	local project=$1
+
+	local checksum_path
+	local signature_path
+	local prefix
+	local path
+
+	for prefix in "$SYSTEMS/$MACHINE" "$IMAGES" "$TOOLS/$MACHINE"
+	do
+		path="$root/$prefix/$project.$TAR_XZ"
+
+		if ! [ -f "$path" ]
+		then
+			continue
+		fi
+
+		checksum_path="$path.$SHA256SUM"
+		signature_path="$path.$ASC"
+
+		if [ -f "$checksum_path" ]
+		then
+			(
+				cd "$( dirname "$path" )"
+				sha256sum -c "$project.$TAR_XZ.$SHA256SUM"
+			)
+		else
+			printf "Could not verify $project checksum!\n" >&2
+		fi
+
+		if [ -f "$signature_path" ]
+		then
+			gpg --armor --verify "$signature_path" "$path"
+		else
+			printf "Could not verify $project signature!\n" >&2
+		fi
+
+		printf "\nVerified $project\n"
+
+		return 0
+	done
+
+	printf "Could not verify $project\n" >&2
+	return 1
+}
+
+extract() {
+	local project=$1
+
+	local extract_path
+	local prefix
+	local path
+
+	for prefix in "$SYSTEMS/$MACHINE" "$IMAGES" "$TOOLS/$MACHINE"
+	do
+		path="$root/$prefix/$project.$TAR_XZ"
+
+		if ! [ -f "$path" ]
+		then
+			continue
+		fi
+
+		if [ "$prefix" = "$SYSTEMS/$MACHINE" ]
+		then
+			printf "Skiping $project extract\n"
+			return 0
+		fi
+
+		extract_path=$( dirname "$path" )
+
+		tar -xf "$path" -ps -C "$extract_path"
+
+		printf "Extracted $project\n"
+
+		return 0
+	done
+
+	printf "Could not extract $project\n" >&2
+	return 1
+}
+
+requirements() {
+	local requirement
+	local requirement_path
+
+	for requirement in "$@"
+	do
+		requirement_path=$( which "$requirement" || true )
+
+		if [ -z "$requirement_path" ]
+		then
+			printf "Missing requirement: $requirement\n" >&2
+			exit 1
+		fi
+	done
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	if [ -z "$MACHINE" ]
+	then
+		MACHINE=$( uname -m )
+	fi
+
+	if [ -z "$DOWNLOAD_URL" ]
+	then
+		printf "Missing download URL\n" >&2
+		exit 1
+	fi
+}
+
+paper_release() {
+	local action=$1
+	shift
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ]
+	then
+		usage
+		exit 1
+	fi
+
+	requirements "tar" "sha256sum" "gpg"
+
+	case $action in
+	"download")
+		download "$@"
+		;;
+	"sources")
+		sources "$@"
+		;;
+	"verify")
+		verify "$@"
+		;;
+	"extract")
+		extract "$@"
+		;;
+	"prepare")
+		download "$argument"
+		verify "$argument"
+		extract "$argument"
+		;;
+	esac
+}
+
+paper_release "$@"

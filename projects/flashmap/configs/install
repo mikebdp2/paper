@@ -1,0 +1,5 @@
+fmap.pc:fmap.pc
+libfmap.a:libfmap.a
+libfmap.so.0:libfmap.so.0
+fmap.h:fmap.h
+valstr.h:valstr.h

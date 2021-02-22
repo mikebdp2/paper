@@ -1,0 +1,12 @@
+core/libcrypto_utils/tests/android_pubkey_test.cpp
+core/libcutils/tests/MemsetTest.cpp
+core/libpixelflinger/pixelflinger.cpp
+core/libsparse/sparse_crc32.c
+core/libziparchive/zip_archive_test.cc
+core/storaged/tests/storaged_test.cpp
+core/trusty/keymaster/trusty_keymaster_main.cpp
+extras/ext4_utils/crc16.c
+extras/tests/pftest/pftest.c
+f2fs-tools/lib/libf2fs.c
+f2fs-tools/tools/sha512.c
+selinux/libsepol/cil/src/cil.c

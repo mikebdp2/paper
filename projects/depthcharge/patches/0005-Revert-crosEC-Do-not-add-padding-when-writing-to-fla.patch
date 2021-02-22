@@ -1,0 +1,39 @@
+From 9d5774216f28189cdf57da41ba0718825b853ff5 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 22:54:49 +0200
+Subject: [PATCH 5/6] Revert "crosEC: Do not add padding when writing to flash"
+
+This reverts commit 42f2d0c408b2b311886b19d349f8505af81a629d.
+---
+ src/drivers/ec/cros/ec.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/src/drivers/ec/cros/ec.c b/src/drivers/ec/cros/ec.c
+index acf3170b..b382097f 100644
+--- a/src/drivers/ec/cros/ec.c
++++ b/src/drivers/ec/cros/ec.c
+@@ -905,9 +905,18 @@ static int ec_flash_write(CrosEc *me, const uint8_t *data, uint32_t offset,
+ 	end = offset + size;
+ 	for (off = offset; off < end; off += burst, data += burst) {
+ 		uint32_t todo = MIN(end - off, burst);
+-		/* If SPI flash needs to add padding to make a legitimate write
+-		 * block, do so on EC. */
+-		ret = ec_flash_write_block(me, data, off, todo);
++
++		if (todo < burst) {
++			uint8_t *buf = xmalloc(burst);
++			memcpy(buf, data, todo);
++			// Pad the buffer with a decent guess for erased data
++			// value.
++			memset(buf + todo, 0xff, burst - todo);
++			ret = ec_flash_write_block(me, buf, off, burst);
++			free(buf);
++		} else {
++			ret = ec_flash_write_block(me, data, off, burst);
++		}
+ 		if (ret)
+ 			return ret;
+ 	}
+-- 
+2.18.0
+

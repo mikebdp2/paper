@@ -1,0 +1,76 @@
+From f2b3a26f23f200f1a172b2b7cda1da786be1caac Mon Sep 17 00:00:00 2001
+From: Puthikorn Voravootivat <puthik@chromium.org>
+Date: Thu, 28 Aug 2014 14:03:11 -0700
+Subject: [PATCH 1/7] ectool: read max outsize/insize from ec during comm_init
+
+Current ectool uses max outsize / insize from protocol v2
+even if we have a v3 protocol ec. This makes some command
+not working when actual size supported by ec is less than
+max size from protocol v2.
+
+This CL uses protoinfo command to read max size from ec
+during the initialization process to correctly set max size
+for ec with protocol v3+. For ec with protocol v2, protoinfo
+command won't exist, hence ectool won't modify the max size
+and used the size that we set when init the protocol.
+
+BRANCH=none
+BUG=chrome-os-partner:31660
+TEST=Run 'ectool flashread 0 0x1000 /tmp/fr' in ryu
+
+Change-Id: I226b6c2fb2f7e9be73032f2c5146d2710939b293
+Signed-off-by: Puthikorn Voravootivat <puthik@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/214838
+Reviewed-by: Randall Spangler <rspangler@chromium.org>
+---
+ util/comm-host.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/util/comm-host.c b/util/comm-host.c
+index d0ab376aa..c0b01940c 100644
+--- a/util/comm-host.c
++++ b/util/comm-host.c
+@@ -6,6 +6,7 @@
+ #include <errno.h>
+ #include <stdint.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include "comm-host.h"
+@@ -60,6 +61,8 @@ static int fake_readmem(int offset, int bytes, void *dest)
+ 
+ int comm_init(void)
+ {
++	struct ec_response_get_protocol_info info;
++
+ 	/* Default memmap access */
+ 	ec_readmem = fake_readmem;
+ 
+@@ -88,6 +91,23 @@ int comm_init(void)
+ 		return 1;
+ 	}
+ 
++	/* read max request / response size from ec for protocol v3+ */
++	if (ec_command(EC_CMD_GET_PROTOCOL_INFO, 0, NULL, 0, &info,
++		sizeof(info)) == sizeof(info)) {
++		ec_max_outsize = info.max_request_packet_size -
++			 sizeof(struct ec_host_request);
++		ec_max_insize = info.max_response_packet_size -
++			sizeof(struct ec_host_response);
++
++		ec_outbuf = realloc(ec_outbuf, ec_max_outsize);
++		ec_inbuf = realloc(ec_inbuf, ec_max_insize);
++
++		if (!ec_outbuf || !ec_inbuf) {
++			fprintf(stderr, "Unable to reallocate buffers\n");
++			return 1;
++		}
++	}
++
+ 	return 0;
+ 
+ }
+-- 
+2.18.0
+

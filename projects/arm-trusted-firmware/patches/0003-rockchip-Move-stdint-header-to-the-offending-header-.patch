@@ -1,0 +1,47 @@
+From c07ba31f32f38eae4fe3a63054775916e163a0e7 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 20:37:25 +0200
+Subject: [PATCH 3/3] rockchip: Move stdint header to the offending header file
+
+The stdint header was introduced to rk3399's plat_sip_calls.c in order
+to fix missing stdint definitions. However, ordering headers
+alphabetically caused the fix to be ineffective, as stint was then
+included after the offending header file (dfs.h).
+
+Move the stdint include to that header to properly fix the issue.
+
+Change-Id: Ieaad37a7932786971488ab58fc5b169bfa79e197
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ plat/rockchip/rk3399/drivers/dram/dfs.h | 2 ++
+ plat/rockchip/rk3399/plat_sip_calls.c   | 1 -
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/plat/rockchip/rk3399/drivers/dram/dfs.h b/plat/rockchip/rk3399/drivers/dram/dfs.h
+index 679216c8..e847b2e0 100644
+--- a/plat/rockchip/rk3399/drivers/dram/dfs.h
++++ b/plat/rockchip/rk3399/drivers/dram/dfs.h
+@@ -7,6 +7,8 @@
+ #ifndef __SOC_ROCKCHIP_RK3399_DFS_H__
+ #define __SOC_ROCKCHIP_RK3399_DFS_H__
+ 
++#include <stdint.h>
++
+ struct rk3399_sdram_default_config {
+ 	unsigned char bl;
+ 	/* 1:auto precharge, 0:never auto precharge */
+diff --git a/plat/rockchip/rk3399/plat_sip_calls.c b/plat/rockchip/rk3399/plat_sip_calls.c
+index a78b8b3f..905d84a6 100644
+--- a/plat/rockchip/rk3399/plat_sip_calls.c
++++ b/plat/rockchip/rk3399/plat_sip_calls.c
+@@ -10,7 +10,6 @@
+ #include <plat_sip_calls.h>
+ #include <rockchip_sip_svc.h>
+ #include <runtime_svc.h>
+-#include <stdint.h>
+ 
+ #define RK_SIP_DDR_CFG		0x82000008
+ #define DRAM_INIT		0x00
+-- 
+2.17.1
+

@@ -1,0 +1,261 @@
+#!/bin/bash
+
+# Copyright (C) 2016 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+arguments() {
+	project_arguments_targets "$project" "$@"
+}
+
+usage() {
+	project_usage_actions "$project" "config" "menuconfig" "defconfig" "image" "modules" "headers"
+	project_usage_arguments "$project" "$@"
+}
+
+download() {
+	local repository=$project
+
+	project_download_git "$project" "$repository" "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/ https://github.com/torvalds/linux.git" "$@"
+
+	project_action "download" "crossgcc"
+}
+
+download_check() {
+	local repository=$project
+
+	project_download_check_git "$project" "$repository" "$@"
+}
+
+extract() {
+	project_extract "$project" "$@"
+}
+
+extract_check() {
+	project_extract_check "$project" "$@"
+}
+
+update() {
+	local repository=$project
+
+	project_update_git "$project" "$repository" "$@"
+}
+
+update_check() {
+	local repository=$project
+
+	project_update_check_git "$project" "$repository" "$@"
+}
+
+kconfig() {
+	local action=$1
+	shift
+
+	local repository=$project
+
+	project_sources_directory_missing_empty_error "$project" "$repository" "$@"
+
+	if git_project_check "$repository"
+	then
+		git_project_checkout "$project" "$repository" "$@"
+	fi
+
+	local sources_path=$( project_sources_path "$project" "$repository" "$@" )
+	local build_path=$( project_build_path "$project" "$@" )
+	local config_path=$( linux_config_path "$@" )
+	local modules_install_path="$build_path/modules"
+	local headers_install_path="$build_path/headers"
+	local defconfig_path="$build_path/defconfig"
+	local firmware_path=$( project_sources_path "linux-firmware" "linux-firmware" )
+
+	local arch=$( linux_arch "$@" )
+	local target=$( linux_target "$arch" )
+
+	requirements "bc"
+
+	if [ "$arch" = "arm" ] || [ "$arch" = "arm64" ]
+	then
+		requirements "dtc"
+	fi
+
+	local crossgcc_bin_prefix=$( project_action "prefix" "crossgcc" "$arch" )
+
+	if [ -n "$crossgcc_bin_prefix" ]
+	then
+		project_action "build" "crossgcc" "$arch"
+	fi
+
+	mkdir -p "$build_path"
+
+	case $action in
+	"config")
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" KCONFIG_ALLCONFIG="$config_path" "alldefconfig"
+		;;
+	"menuconfig")
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" "menuconfig"
+		;;
+	"defconfig")
+		local confirm
+
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" "savedefconfig"
+
+		printf "Diff:\n"
+		diff -u "$config_path" "$defconfig_path" || true
+
+		printf "Press enter to save defconfig: "
+		read confirm
+
+		cp "$defconfig_path" "$config_path"
+		;;
+	"image")
+		if [ "$arch" = "arm" ] || [ "$arch" = "arm64" ]
+		then
+			make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" "dtbs"
+		fi
+
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" CONFIG_EXTRA_FIRMWARE_DIR="$firmware_path" "$target"
+		;;
+	"modules")
+		local version
+
+		mkdir -p "$modules_install_path"
+
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" CONFIG_EXTRA_FIRMWARE_DIR="$firmware_path" "modules"
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" INSTALL_MOD_PATH="$modules_install_path" "modules_install"
+
+		ls "$modules_install_path/lib/modules/" | while read version
+		do
+			rm -f "$modules_install_path/lib/modules/$version/source"
+			rm -f "$modules_install_path/lib/modules/$version/build"
+		done
+		;;
+	"headers")
+		mkdir -p "$headers_install_path"
+
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" INSTALL_HDR_PATH="$headers_install_path" "headers_install"
+		;;
+	esac
+}
+
+config() {
+	kconfig "config" "$@"
+}
+
+menuconfig() {
+	kconfig "menuconfig" "$@"
+}
+
+defconfig() {
+	kconfig "defconfig" "$@"
+}
+
+image() {
+	kconfig "image" "$@"
+}
+
+modules() {
+	kconfig "modules" "$@"
+}
+
+headers() {
+	kconfig "headers" "$@"
+}
+
+build() {
+	local repository=$project
+
+	project_sources_directory_missing_empty_error "$project" "$repository" "$@"
+
+	if git_project_check "$repository"
+	then
+		git_project_checkout "$project" "$repository" "$@"
+	fi
+
+	local sources_path=$( project_sources_path "$project" "$repository" "$@" )
+	local build_path=$( project_build_path "$project" "$@" )
+	local config_path=$( linux_config_path "$@" )
+	local modules_install_path="$build_path/modules"
+	local headers_install_path="$build_path/headers"
+	local firmware_path=$( project_sources_path "linux-firmware" "linux-firmware" )
+
+	local arch=$( linux_arch "$@" )
+	local target=$( linux_target "$arch" )
+	local version
+
+	if [ "$arch" = "arm" ] || [ "$arch" = "arm64" ]
+	then
+		requirements "dtc"
+	fi
+
+	local crossgcc_bin_prefix=$( project_action "prefix" "crossgcc" "$arch" )
+
+	if [ -n "$crossgcc_bin_prefix" ]
+	then
+		project_action "build" "crossgcc" "$arch"
+	fi
+
+	mkdir -p "$build_path"
+	mkdir -p "$modules_install_path"
+	mkdir -p "$headers_install_path"
+
+	make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" KCONFIG_ALLCONFIG="$config_path" "alldefconfig"
+
+	if [ "$arch" = "arm" ] || [ "$arch" = "arm64" ]
+	then
+		make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" "dtbs"
+	fi
+
+	make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" CONFIG_EXTRA_FIRMWARE_DIR="$firmware_path" "$target" "modules"
+	make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" INSTALL_MOD_PATH="$modules_install_path" "modules_install"
+
+	ls "$modules_install_path/lib/modules/" | while read version
+	do
+		rm -f "$modules_install_path/lib/modules/$version/source"
+		rm -f "$modules_install_path/lib/modules/$version/build"
+	done
+
+	make -C "$sources_path" O="$build_path" CROSS_COMPILE="$crossgcc_bin_prefix" ARCH="$arch" INSTALL_HDR_PATH="$headers_install_path" "headers_install"
+}
+
+build_check() {
+	project_build_check "$project" "$@"
+}
+
+install() {
+	project_install "$project" "$@"
+}
+
+install_check() {
+	project_install_check "$project" "$@"
+}
+
+release() {
+	local repository=$project
+
+	project_release_install_archive "$project" "$IMAGES" "$@"
+
+	project_release_sources_git "$project" "$repository" "$@"
+}
+
+release_check() {
+	local repository=$project
+
+	project_release_install_archive_check "$project" "$IMAGES" "$@"
+
+	project_release_check_sources_git "$project" "$repository" "$@"
+}
+
+clean() {
+	project_clean "$project" "$@"
+}

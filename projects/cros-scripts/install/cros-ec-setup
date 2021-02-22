@@ -1,0 +1,207 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+DEVICES=("nyan" "veyron" "elm" "kevin")
+
+usage() {
+	printf "$executable [action] [ec image] (device)\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  install - Install ec image to storage\n" >&2
+	printf "  extract - Extract ec image from storage\n" >&2
+
+	printf "\nDevices:\n" >&2
+
+	for device in "${DEVICES[@]}"
+	do
+		printf "  $device\n" >&2
+	done
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_flasher
+	printf "  FLASHROM_CROS_PATH - Path to Chromium OS flashrom tool\n" >&2
+	printf "  CROS_EC_TOOLS_PATH - Path to Chromium OS EC tools\n" >&2
+}
+
+servo() {
+	local ec_image_path=$1
+	local device=$2
+	local flasher=$3
+	local argument=$4
+
+	local servo_test
+	local ec_tty
+
+	servo_test=$( dut-control "i2c_mux" 2>&1 | grep "Connection refused" || true )
+	if [ -n "$servo_test" ]
+	then
+		printf "Unable to connect to servo daemon\n" >&2
+		exit 1
+	fi
+
+	case $device in
+	"nyan"*|"veyron"*|"elm")
+		ec_tty=$( dut-control raw_ec_uart_pty | sed "s/[^:]*://g" )
+
+		dut-control ec_ec3po_interp_connect:off ec_uart_en:on ec_uart_parity:even ec_uart_baudrate:115200 ec_boot_mode:on cold_reset:on warm_reset:on
+		dut-control cold_reset:off
+
+		if [ "$argument" = "-w" ]
+		then
+			stm32mon -d "$ec_tty" -U -u -e -w "$ec_image_path"
+		else
+			stm32mon -d "$ec_tty" -U -r "$ec_image_path"
+		fi
+
+		dut-control ec_ec3po_interp_connect:on ec_uart_parity:none ec_boot_mode:off cold_reset:on warm_reset:off
+		dut-control cold_reset:off
+		;;
+	"kevin")
+		dut-control fw_wp_en:on spi1_buf_en:on spi1_buf_on_flex_en:on spi1_vref:pp1800 cold_reset:on
+		sleep 1
+
+		flashrom -p ft2232_spi:type=servo-v2,port=B "$argument" "$install_path/ec.bin"
+
+		dut-control fw_wp_en:off spi1_buf_en:off spi1_buf_on_flex_en:off spi1_vref:off cold_reset:off
+		;;
+	*)
+		( if [ "$argument" = "-w" ]
+		then
+			stm32mon -d "$FLASHER" -U -u -e -w "$ec_image_path"
+		else
+			stm32mon -d "$FLASHER" -U -r "$ec_image_path"
+		fi ) || flashrom -p "$FLASHER" "$argument" "$ec_image_path"
+		;;
+	esac
+}
+
+flash_ec() {
+	local ec_image_path=$1
+	local device=$2
+	local action=$3
+
+	local argument
+	local flasher
+
+	case $action in
+	"read")
+		argument="-r"
+		;;
+	"write")
+		argument="-w"
+		;;
+	esac
+
+	case $FLASHER in
+	"servo-v2")
+		flasher="ft2232_spi:type=servo-v2"
+		;;
+	esac
+
+	if [ -n "$flasher" ]
+	then
+		servo "$ec_image_path" "$device" "$flasher" "$argument"
+	else
+		( if [ "$argument" = "-w" ]
+		then
+			stm32mon -d "$FLASHER" -U -u -e -w "$ec_image_path"
+		else
+			stm32mon -d "$FLASHER" -U -r "$ec_image_path"
+		fi ) || flashrom -p "$FLASHER" "$argument" "$ec_image_path"
+	fi
+}
+
+install() {
+	local ec_image_path=$1
+	local device=$2
+
+	printf "Configuration summary:\n"
+	printf "  EC image path: $ec_image_path\n"
+	printf "  Device: $device\n\n"
+
+	flash_ec "$ec_image_path" "$device" "write"
+
+	printf "\nEC installation completed\n"
+}
+
+extract() {
+	local ec_image_path=$1
+	local device=$2
+
+	printf "Configuration summary:\n"
+	printf "  EC image path: $ec_image_path\n"
+	printf "  Device: $device\n\n"
+
+	flash_ec "$ec_image_path" "$device" "read"
+
+	printf "\nEC extraction completed\n"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+
+	if [ -n "$FLASHROM_CROS_PATH" ]
+	then
+		PATH="$FLASHROM_CROS_PATH:$PATH"
+	fi
+
+	if [ -n "$CROS_EC_TOOLS_PATH" ]
+	then
+		PATH="$CROS_EC_TOOLS_PATH:$PATH"
+	fi
+}
+
+cros_ec_setup() {
+	local action=$1
+	local ec_image_path=$2
+	local device=$3
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$ec_image_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	if [ -n "$FLASHER" ]
+	then
+		requirements "stm32mon" "flashrom"
+	else
+		printf "No supported installation method found\n" >&2
+	fi
+
+	case $action in
+	"install")
+		install "$ec_image_path" "$device"
+		;;
+	"extract")
+		extract "$ec_image_path" "$device"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+cros_ec_setup "$@"

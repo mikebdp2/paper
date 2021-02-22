@@ -1,0 +1,54 @@
+From 4b367f07a840855d7be8adc3e9bb08bf3d97aeba Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Tue, 11 Aug 2015 00:07:18 +0200
+Subject: [PATCH 5/6] firmware: Localization keys removal
+
+Since we're using a text-based interface, binding the arrow keys to localization
+changes has no effect and only makes the screen flicker.
+
+Change-Id: I92dfe63d9d0826217653e29d3f26fb0ab29071f1
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ firmware/lib/vboot_ui.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/firmware/lib/vboot_ui.c b/firmware/lib/vboot_ui.c
+index ffc73c66..22b44901 100644
+--- a/firmware/lib/vboot_ui.c
++++ b/firmware/lib/vboot_ui.c
+@@ -144,7 +144,6 @@ int VbUserConfirms(struct vb2_context *ctx, uint32_t confirm_flags)
+ 					return 1;
+ 				}
+ 			}
+-			VbCheckDisplayKey(ctx, key);
+ 		}
+ 		VbExSleepMs(CONFIRM_KEY_DELAY);
+ 	}
+@@ -386,7 +385,6 @@ developer_mode_screen:
+ 			break;
+ 		default:
+ 			VB2_DEBUG("VbBootDeveloper() - pressed key %d\n", key);
+-			VbCheckDisplayKey(ctx, key);
+ 			break;
+ 		}
+ 	} while(hold || vb2_audio_looping());
+@@ -455,7 +453,6 @@ static VbError_t recovery_ui(struct vb2_context *ctx)
+ 		VB2_DEBUG("VbBootRecovery() waiting for manual recovery\n");
+ 		while (1) {
+ 			key = VbExKeyboardRead();
+-			VbCheckDisplayKey(ctx, key);
+ 			if (VbWantShutdown(ctx, key))
+ 				return VBERROR_SHUTDOWN_REQUESTED;
+ 			VbExSleepMs(REC_KEY_DELAY);
+@@ -548,8 +545,6 @@ static VbError_t recovery_ui(struct vb2_context *ctx)
+ 					i = 4;
+ 					break;
+ 				}
+-			} else {
+-				VbCheckDisplayKey(ctx, key);
+ 			}
+ 			if (VbWantShutdown(ctx, key))
+ 				return VBERROR_SHUTDOWN_REQUESTED;
+-- 
+2.17.1
+

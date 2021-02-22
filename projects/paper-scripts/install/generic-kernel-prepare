@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Copyright (C) 2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+usage() {
+	printf "$executable [action] [kernel files] (rootfs medium)\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  fit - Prepare a fit kernel image from kernel files\n" >&2
+	printf "  append - Prepare a kernel image with appended device-tree from kernel files\n" >&2
+	printf "  extlinux - Prepare extlinux files from kernel files\n" >&2
+
+	usage_media_common "usb" "mmc" "emmc"
+}
+
+fit() {
+	local kernel_files_path=$1
+
+	kernel_prepare_fit "$kernel_files_path"
+}
+
+append() {
+	local kernel_files_path=$1
+
+	kernel_prepare_append "$kernel_files_path"
+}
+
+extlinux() {
+	local kernel_files_path=$1
+	local rootfs_medium=$2
+
+	kernel_prepare_extlinux "$kernel_files_path" "$rootfs_medium"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+}
+
+generic_kernel_prepare() {
+	local action=$1
+	local kernel_files_path=$2
+	local rootfs_medium=$3
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$kernel_files_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	case $action in
+	"fit")
+		kernel_requirements_fit
+		fit "$kernel_files_path"
+		;;
+	"append")
+		append "$kernel_files_path"
+		;;
+	"extlinux")
+		if [ -z "$rootfs_medium" ]
+		then
+			usage
+			exit 1
+		fi
+
+		extlinux "$kernel_files_path" "$rootfs_medium"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+generic_kernel_prepare "$@"

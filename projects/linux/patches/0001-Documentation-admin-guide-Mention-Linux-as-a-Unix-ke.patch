@@ -1,0 +1,33 @@
+From 46e257d195f80a18899b66a1fc31c99715fecfb4 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 4 Mar 2018 12:57:01 +0100
+Subject: [PATCH] Documentation: admin-guide: Mention Linux as a Unix kernel
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ Documentation/admin-guide/README.rst | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/admin-guide/README.rst b/Documentation/admin-guide/README.rst
+index 63066db39910..6232cc8af194 100644
+--- a/Documentation/admin-guide/README.rst
++++ b/Documentation/admin-guide/README.rst
+@@ -8,12 +8,12 @@ kernel, and what to do if something goes wrong.
+ What is Linux?
+ --------------
+ 
+-  Linux is a clone of the operating system Unix, written from scratch by
++  Linux is a clone of the Unix kernel, written from scratch by
+   Linus Torvalds with assistance from a loosely-knit team of hackers across
+   the Net. It aims towards POSIX and Single UNIX Specification compliance.
+ 
+-  It has all the features you would expect in a modern fully-fledged Unix,
+-  including true multitasking, virtual memory, shared libraries, demand
++  It has all the features you would expect in a modern fully-fledged Unix
++  kernel, including true multitasking, virtual memory, shared libraries, demand
+   loading, shared copy-on-write executables, proper memory management,
+   and multistack networking including IPv4 and IPv6.
+ 
+-- 
+2.16.2
+

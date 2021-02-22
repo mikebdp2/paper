@@ -1,0 +1,5 @@
+arch/arm/boot/dts/tegra124-nyan-big-rev0_2.dtb:tegra124-nyan-big-rev0_2.dtb
+arch/arm/boot/dts/tegra124-nyan-big-rev3_7.dtb:tegra124-nyan-big-rev3_7.dtb
+arch/arm/boot/dts/tegra124-nyan-big-rev8_9.dtb:tegra124-nyan-big-rev8_9.dtb
+arch/arm/boot/dts/tegra124-nyan-blaze.dtb:tegra124-nyan-blaze.dtb
+arch/arm/boot/zImage:zImage

@@ -1,0 +1,6 @@
+cgpt/cgpt:cgpt
+devkeys:devkeys
+futility/futility:futility
+utility/crossystem:crossystem
+utility/tpmc:tpmc
+utility/dumpRSAPublicKey:dumpRSAPublicKey

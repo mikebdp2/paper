@@ -1,0 +1,39 @@
+From db91e71a39635a4914db108a83e3789db4959629 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 28 Mar 2018 23:49:58 +0200
+Subject: [PATCH 1/7] usb: musb: Support gadget mode when the port is set to
+ dual role
+
+This allows dual-role ports to be reported as having gadget mode by the
+musb_has_gadget helper. This is required to enable MUSB at all with MUSB
+glue layers that set the port mode to MUSB_PORT_MODE_DUAL_ROLE at init.
+
+Most notably, this allows calling musb_start when needed in the virtual
+MUSB root HUB, regardless of whether the current mode should be gadget
+or host.
+
+This fixes USB OTG on Allwinner devices that I could test it with,
+mainly A20 devices.
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ drivers/usb/musb/musb_virthub.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/musb/musb_virthub.c b/drivers/usb/musb/musb_virthub.c
+index 2f8dd9826e94..1a20d132b003 100644
+--- a/drivers/usb/musb/musb_virthub.c
++++ b/drivers/usb/musb/musb_virthub.c
+@@ -254,7 +254,8 @@ static int musb_has_gadget(struct musb *musb)
+ #ifdef CONFIG_USB_MUSB_HOST
+ 	return 1;
+ #else
+-	return musb->port_mode == MUSB_PORT_MODE_HOST;
++	return musb->port_mode == MUSB_PORT_MODE_HOST ||
++	       musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE;
+ #endif
+ }
+ 
+-- 
+2.17.1
+

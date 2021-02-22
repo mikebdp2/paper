@@ -1,0 +1,5 @@
+common:common
+generic-boot-setup:generic-boot-setup
+generic-kernel-setup:generic-kernel-setup
+generic-kernel-prepare:generic-kernel-prepare
+generic-medium-setup:generic-medium-setup

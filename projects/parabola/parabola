@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Copyright (C) 2016 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+arguments() {
+	project_arguments_targets "$project" "$@"
+}
+
+usage() {
+	project_usage_actions "$project"
+	project_usage_arguments "$project" "$@"
+}
+
+update() {
+	local archs=$( parabola_archs )
+	local pacman_conf_path
+
+	for arch in $archs
+	do
+		pacman_conf_path=$( parabola_pacman_config_path "$arch" )
+
+		wget "https://git.parabola.nu/abslibre.git/plain/libre/pacman/pacman.conf.$arch" -O "$pacman_conf_path"
+	done
+}
+
+install() {
+	local pacman_conf_path=$( parabola_pacman_config_path "$@" )
+	local install_path=$( project_install_path "$project" "$@" )
+	local packages=$( parabola_packages "$@" )
+	local arch=$( parabola_arch_match )
+
+	requirements "pacstrap"
+
+	if ! parabola_host_check
+	then
+		printf "Host is not running Parabola, aborting!" >&2
+		return 1
+	fi
+
+	if [ -z "$arch" ]
+	then
+		printf "Unsupported arch, aborting!" >&2
+		return 1
+	fi
+
+	mkdir -p "$install_path"
+
+	execute_root pacstrap -M -G -d -c -C "$pacman_conf_path" "$install_path" $packages
+
+	# Set hostname.
+	execute_root touch "$install_path/etc/hostname"
+	execute_root chmod 666 "$install_path/etc/hostname"
+	echo "$project" > "$install_path/etc/hostname"
+	execute_root chmod 644 "$install_path/etc/hostname"
+	execute_root sed "s/\tlocalhost/\tlocalhost $project/g" -i "$install_path/etc/hosts"
+}
+
+install_check() {
+	local install_path=$( project_install_path "$project" "$@" )
+
+	directory_filled_check "$install_path"
+}
+
+release() {
+	project_release_install_rootfs "$project" "$SYSTEMS" "$@"
+}
+
+release_check() {
+	project_release_install_rootfs_check "$project" "$SYSTEMS" "$@"
+}
+
+clean() {
+	project_clean_rootfs "$project" "$@"
+}

@@ -1,0 +1,76 @@
+From 193d2f897e62ca9b5c5d25f266f4b95d15f9c951 Mon Sep 17 00:00:00 2001
+From: WANG Cong <xiyou.wangcong@gmail.com>
+Date: Fri, 14 Feb 2014 15:10:46 -0800
+Subject: [PATCH 05/19] openvswitch: rename ->sync to ->syncp
+
+Openvswitch defines u64_stats_sync as ->sync rather than ->syncp,
+so fails to compile with netdev_alloc_pcpu_stats(). So just rename it to ->syncp.
+
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Fixes: 1c213bd24ad04f4430031 (net: introduce netdev_alloc_pcpu_stats() for drivers)
+Cc: David S. Miller <davem@davemloft.net>
+Signed-off-by: Cong Wang <xiyou.wangcong@gmail.com>
+Reviewed-by: Flavio Leitner <fbl@redhat.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ net/openvswitch/datapath.c | 12 ++++++------
+ net/openvswitch/datapath.h |  2 +-
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/net/openvswitch/datapath.c b/net/openvswitch/datapath.c
+index 144bbfa7a9dc..a3276e3c4feb 100644
+--- a/net/openvswitch/datapath.c
++++ b/net/openvswitch/datapath.c
+@@ -256,10 +256,10 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
+ 
+ out:
+ 	/* Update datapath statistics. */
+-	u64_stats_update_begin(&stats->sync);
++	u64_stats_update_begin(&stats->syncp);
+ 	(*stats_counter)++;
+ 	stats->n_mask_hit += n_mask_hit;
+-	u64_stats_update_end(&stats->sync);
++	u64_stats_update_end(&stats->syncp);
+ }
+ 
+ static struct genl_family dp_packet_genl_family = {
+@@ -295,9 +295,9 @@ int ovs_dp_upcall(struct datapath *dp, struct sk_buff *skb,
+ err:
+ 	stats = this_cpu_ptr(dp->stats_percpu);
+ 
+-	u64_stats_update_begin(&stats->sync);
++	u64_stats_update_begin(&stats->syncp);
+ 	stats->n_lost++;
+-	u64_stats_update_end(&stats->sync);
++	u64_stats_update_end(&stats->syncp);
+ 
+ 	return err;
+ }
+@@ -610,9 +610,9 @@ static void get_dp_stats(struct datapath *dp, struct ovs_dp_stats *stats,
+ 		percpu_stats = per_cpu_ptr(dp->stats_percpu, i);
+ 
+ 		do {
+-			start = u64_stats_fetch_begin_irq(&percpu_stats->sync);
++			start = u64_stats_fetch_begin_irq(&percpu_stats->syncp);
+ 			local_stats = *percpu_stats;
+-		} while (u64_stats_fetch_retry_irq(&percpu_stats->sync, start));
++		} while (u64_stats_fetch_retry_irq(&percpu_stats->syncp, start));
+ 
+ 		stats->n_hit += local_stats.n_hit;
+ 		stats->n_missed += local_stats.n_missed;
+diff --git a/net/openvswitch/datapath.h b/net/openvswitch/datapath.h
+index 6be9fbb5e9cb..05317380fc03 100644
+--- a/net/openvswitch/datapath.h
++++ b/net/openvswitch/datapath.h
+@@ -55,7 +55,7 @@ struct dp_stats_percpu {
+ 	u64 n_missed;
+ 	u64 n_lost;
+ 	u64 n_mask_hit;
+-	struct u64_stats_sync sync;
++	struct u64_stats_sync syncp;
+ };
+ 
+ /**
+-- 
+2.17.1
+

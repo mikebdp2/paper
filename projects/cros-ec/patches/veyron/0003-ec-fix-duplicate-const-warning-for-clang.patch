@@ -1,0 +1,75 @@
+From da17c253bb70c51e48dfd069ab5251363f5a970f Mon Sep 17 00:00:00 2001
+From: Yunlian Jiang <yunlian@google.com>
+Date: Fri, 17 Apr 2015 10:29:56 -0700
+Subject: [PATCH 03/14] ec: fix duplicate 'const' warning for clang..
+
+It fixes duplicate 'const' warning.
+
+BUG=chromium:475960
+TEST=the warning is gone.
+BRANCH=none
+Signed-off-by: yunlian@chromium.org
+
+Change-Id: I348fbefec4d681bb8b20c6b8cf84acec4561b391
+Reviewed-on: https://chromium-review.googlesource.com/266109
+Reviewed-by: Vincent Palatin <vpalatin@chromium.org>
+Commit-Queue: Yunlian Jiang <yunlian@chromium.org>
+Tested-by: Yunlian Jiang <yunlian@chromium.org>
+---
+ util/comm-dev.c | 2 +-
+ util/ectool.c   | 2 +-
+ util/lbcc.c     | 6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/util/comm-dev.c b/util/comm-dev.c
+index cdbbbdf48..df16efa94 100644
+--- a/util/comm-dev.c
++++ b/util/comm-dev.c
+@@ -23,7 +23,7 @@ static int fd = -1;
+ #define ARRAY_SIZE(t) (sizeof(t) / sizeof(t[0]))
+ #endif
+ 
+-static const char const *meanings[] = {
++static const char * const meanings[] = {
+ 	"SUCCESS",
+ 	"INVALID_COMMAND",
+ 	"ERROR",
+diff --git a/util/ectool.c b/util/ectool.c
+index 362f3f7a3..d1f0f8933 100644
+--- a/util/ectool.c
++++ b/util/ectool.c
+@@ -5212,7 +5212,7 @@ static int cmd_tmp006cal_v1(int idx, int argc, char *argv[])
+ 	int i, rv, cmdsize;
+ 
+ 	/* Algorithm 1 parameter names */
+-	static const char const *alg1_pname[] = {
++	static const char * const alg1_pname[] = {
+ 		"s0", "a1", "a2", "b0", "b1", "b2", "c2",
+ 		"d0", "d1", "ds", "e0", "e1",
+ 	};
+diff --git a/util/lbcc.c b/util/lbcc.c
+index b34b21e53..d35e05701 100644
+--- a/util/lbcc.c
++++ b/util/lbcc.c
+@@ -81,15 +81,15 @@ static const int num_operands[] = {
+ 
+ #define OP(NAME, BYTES, MNEMONIC) MNEMONIC,
+ #include "lightbar_opcode_list.h"
+-static const char const *opcode_sym[] = {
++static const char * const opcode_sym[] = {
+ 	LIGHTBAR_OPCODE_TABLE
+ };
+ #undef OP
+ 
+-static const char const *control_sym[] = {
++static const char * const control_sym[] = {
+ 	"beg", "end", "phase", "<invalid>"
+ };
+-static const char const *color_sym[] = {
++static const char * const color_sym[] = {
+ 	"r", "g", "b", "<invalid>"
+ };
+ 
+-- 
+2.15.0
+

@@ -1,0 +1,1 @@
+console=ttymxc0,115200 cma=256M root=/dev/sda1 rw rootwait

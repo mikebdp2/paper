@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+ROOTFS_PARTITION_INDEX=1
+
+usage() {
+	printf "$executable [action] [storage] [kernel files] [rootfs medium]\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  install - Install extlinux-configured kernel from kernel files for the medium to storage\n" >&2
+
+	usage_media_common "usb" "mmc" "emmc"
+	usage_storage_common
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_storage
+	usage_variables_partitions
+}
+
+install() {
+	local storage_path=$1
+	local kernel_files_path=$2
+	local rootfs_medium=$3
+
+	kernel_install_extlinux "$storage_path" "$kernel_files_path" "$rootfs_medium" "$ROOTFS_PARTITION_INDEX"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+}
+
+generic_kernel_setup() {
+	local action=$1
+	local storage_path=$2
+	local kernel_files_path=$3
+	local kernel_modules_path=$3
+	local rootfs_medium=$4
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$storage_path" ] || [ -z "$kernel_files_path" ] || [ -z "$kernel_modules_path" ]  || [ -z "$rootfs_medium" ]
+	then
+		usage
+		exit 1
+	fi
+
+	case $action in
+	"install")
+		kernel_requirements_install
+		install "$storage_path" "$kernel_files_path" "$rootfs_medium"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+generic_kernel_setup "$@"

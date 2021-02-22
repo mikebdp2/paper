@@ -1,0 +1,60 @@
+From 03911d4e0424b038b7020122dcb0fa77ab938134 Mon Sep 17 00:00:00 2001
+From: Mike Frysinger <vapier@chromium.org>
+Date: Thu, 16 Apr 2015 01:31:20 -0400
+Subject: [PATCH 3/7] clean up x86 i/o checks
+
+Rather than hardcode a specific mips toolchain, do a build-time test to
+see if the target is x86 based.
+
+BUG=chromium:443783
+TEST=link still includes comm-lpc
+TEST=arm64 omits comm-lpc
+BRANCH=none
+
+Change-Id: I0253df6cbe89bee231ec643dd6bb3498eb040708
+Reviewed-on: https://chromium-review.googlesource.com/265793
+Reviewed-by: Gwendal Grignou <gwendal@chromium.org>
+Commit-Queue: Mike Frysinger <vapier@chromium.org>
+Tested-by: Mike Frysinger <vapier@chromium.org>
+---
+ util/comm-lpc.c | 5 +++++
+ util/ectool.c   | 3 ++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/util/comm-lpc.c b/util/comm-lpc.c
+index 25f0bea4c..ca9e6a182 100644
+--- a/util/comm-lpc.c
++++ b/util/comm-lpc.c
+@@ -3,6 +3,9 @@
+  * found in the LICENSE file.
+  */
+ 
++/* The I/O asm funcs exist only on x86. */
++#if defined(__i386__) || defined(__x86_64__)
++
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <sys/io.h>
+@@ -309,3 +312,5 @@ int comm_init_lpc(void)
+ 	ec_readmem = ec_readmem_lpc;
+ 	return 0;
+ }
++
++#endif
+diff --git a/util/ectool.c b/util/ectool.c
+index 7bb2f2e2a..0a96a0a8f 100644
+--- a/util/ectool.c
++++ b/util/ectool.c
+@@ -755,7 +755,8 @@ int cmd_flash_protect(int argc, char *argv[])
+ 	return 0;
+ }
+ 
+-#ifdef __x86_64
++/* The I/O asm funcs exist only on x86. */
++#if defined(__i386__) || defined(__x86_64__)
+ #include <sys/io.h>
+ 
+ int cmd_serial_test(int argc, char *argv[])
+-- 
+2.18.0
+

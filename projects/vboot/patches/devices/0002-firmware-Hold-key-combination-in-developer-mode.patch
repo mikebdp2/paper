@@ -1,0 +1,50 @@
+From c8fc7cf2f7670372b508f749f5a5ec1cfbe40865 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Mon, 10 Aug 2015 22:59:50 +0200
+Subject: [PATCH 2/6] firmware: Hold key combination in developer mode
+
+This binds the Ctrl + H key combination to hold the developer mode screen.
+
+Change-Id: Ia76080eacd2e5e78b35b83d0f3783bfa5137794a
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ firmware/lib/vboot_ui.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/firmware/lib/vboot_ui.c b/firmware/lib/vboot_ui.c
+index 5eb78f0a..dd2843a1 100644
+--- a/firmware/lib/vboot_ui.c
++++ b/firmware/lib/vboot_ui.c
+@@ -167,6 +167,7 @@ VbError_t vb2_developer_ui(struct vb2_context *ctx)
+ 	uint32_t use_usb = 0;
+ 	uint32_t use_legacy = 0;
+ 	uint32_t ctrl_d_pressed = 0;
++	uint32_t hold = 0;
+ 
+ 	VB2_DEBUG("Entering\n");
+ 
+@@ -314,6 +315,12 @@ VbError_t vb2_developer_ui(struct vb2_context *ctx)
+ 			ctrl_d_pressed = 1;
+ 			goto fallout;
+ 			break;
++		case 0x08:
++			/* Ctrl+H = hold */
++			VBDEBUG(("VbBootDeveloper() - "
++				 "hold developer mode screen\n"));
++			hold = 1;
++			break;
+ 		case 0x0c:
+ 			VB2_DEBUG("VbBootDeveloper() - "
+ 				  "user pressed Ctrl+L; Try legacy boot\n");
+@@ -360,7 +367,7 @@ VbError_t vb2_developer_ui(struct vb2_context *ctx)
+ 			VbCheckDisplayKey(ctx, key);
+ 			break;
+ 		}
+-	} while(vb2_audio_looping());
++	} while(hold || vb2_audio_looping());
+ 
+  fallout:
+ 
+-- 
+2.17.1
+

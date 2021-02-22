@@ -1,0 +1,140 @@
+From b265d6807dab317c96224c89a86e7de0faaf4d79 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Tue, 2 Jan 2018 23:47:56 +0100
+Subject: [PATCH 04/19] Revert "CHROMIUM: Add CLOCK_SYSTEM_TRACE to export the
+ trace clock to user space."
+
+This reverts commit b6d11f4b38b994798728e5c0eea6988e59e41f70.
+---
+ include/linux/kernel.h    | 12 ------------
+ include/uapi/linux/time.h |  5 ++++-
+ kernel/posix-timers.c     | 19 -------------------
+ kernel/trace/trace.c      | 21 ---------------------
+ 4 files changed, 4 insertions(+), 53 deletions(-)
+
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 12409dcdae28..9c0bbc9ddd36 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -545,9 +545,6 @@ extern void tracing_start(void);
+ extern void tracing_stop(void);
+ extern void ftrace_cpu_off(void);
+ extern void ftrace_cpu_on(void);
+-struct timespec;
+-extern void trace_clock_gettime(struct timespec *);
+-extern void trace_clock_getres(struct timespec *);
+ 
+ static inline __printf(1, 2)
+ void ____trace_printk_check_format(const char *fmt, ...)
+@@ -687,15 +684,6 @@ static inline void tracing_start(void) { }
+ static inline void tracing_stop(void) { }
+ static inline void ftrace_cpu_off(void) { }
+ static inline void ftrace_cpu_on(void) { }
+-struct timespec;
+-static inline void trace_clock_gettime(struct timespec *tp)
+-{
+-	getrawmonotonic(tp);
+-}
+-static inline void trace_clock_getres(struct timespec *tp)
+-{
+-	*tp = ktime_to_timespec(KTIME_LOW_RES);
+-}
+ static inline void trace_dump_stack(int skip) { }
+ 
+ static inline void tracing_on(void) { }
+diff --git a/include/uapi/linux/time.h b/include/uapi/linux/time.h
+index da3a3e044e41..0d3c0edc3eda 100644
+--- a/include/uapi/linux/time.h
++++ b/include/uapi/linux/time.h
+@@ -54,8 +54,11 @@ struct itimerval {
+ #define CLOCK_BOOTTIME			7
+ #define CLOCK_REALTIME_ALARM		8
+ #define CLOCK_BOOTTIME_ALARM		9
++
++/*
++ * The IDs of various hardware clocks:
++ */
+ #define CLOCK_SGI_CYCLE			10
+-#define CLOCK_SYSTEM_TRACE		11
+ #define MAX_CLOCKS			16
+ #define CLOCKS_MASK			(CLOCK_REALTIME | CLOCK_MONOTONIC)
+ #define CLOCKS_MONO			CLOCK_MONOTONIC
+diff --git a/kernel/posix-timers.c b/kernel/posix-timers.c
+index 918bce2aa662..62fcdba737be 100644
+--- a/kernel/posix-timers.c
++++ b/kernel/posix-timers.c
+@@ -265,20 +265,6 @@ static int posix_get_boottime(const clockid_t which_clock, struct timespec *tp)
+ }
+ 
+ 
+-static int posix_get_system_trace_res(const clockid_t which_clock,
+-				      struct timespec *tp)
+-{
+-	trace_clock_getres(tp);
+-	return 0;
+-}
+-
+-static int posix_get_system_trace(const clockid_t which_clock,
+-				  struct timespec *tp)
+-{
+-	trace_clock_gettime(tp);
+-	return 0;
+-}
+-
+ /*
+  * Initialize everything, well, just everything in Posix clocks/timers ;)
+  */
+@@ -328,10 +314,6 @@ static __init int init_posix_timers(void)
+ 		.timer_get	= common_timer_get,
+ 		.timer_del	= common_timer_del,
+ 	};
+-	struct k_clock clock_system_trace = {
+-		.clock_getres	= posix_get_system_trace_res,
+-		.clock_get	= posix_get_system_trace,
+-	};
+ 
+ 	posix_timers_register_clock(CLOCK_REALTIME, &clock_realtime);
+ 	posix_timers_register_clock(CLOCK_MONOTONIC, &clock_monotonic);
+@@ -339,7 +321,6 @@ static __init int init_posix_timers(void)
+ 	posix_timers_register_clock(CLOCK_REALTIME_COARSE, &clock_realtime_coarse);
+ 	posix_timers_register_clock(CLOCK_MONOTONIC_COARSE, &clock_monotonic_coarse);
+ 	posix_timers_register_clock(CLOCK_BOOTTIME, &clock_boottime);
+-	posix_timers_register_clock(CLOCK_SYSTEM_TRACE, &clock_system_trace);
+ 
+ 	posix_timers_cache = kmem_cache_create("posix_timers_cache",
+ 					sizeof (struct k_itimer), 0, SLAB_PANIC,
+diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
+index adb2e43959ef..94513c79c17a 100644
+--- a/kernel/trace/trace.c
++++ b/kernel/trace/trace.c
+@@ -293,27 +293,6 @@ cycle_t ftrace_now(int cpu)
+ 	return buffer_ftrace_now(&global_trace.trace_buffer, cpu);
+ }
+ 
+-/*
+- * Interface used by clock_getres(CLOCK_SYSTEM_TRACE).
+- */
+-void trace_clock_getres(struct timespec *tp)
+-{
+-	*tp = ktime_to_timespec(KTIME_LOW_RES);
+-}
+-
+-/*
+- * Interface used by clock_gettime(CLOCK_SYSTEM_TRACE).
+- */
+-void trace_clock_gettime(struct timespec *tp)
+-{
+-	u64 now;
+-	u32 rem;
+-
+-	now = ftrace_now(raw_smp_processor_id());
+-	tp->tv_sec = div_u64_rem(now, NSEC_PER_SEC, &rem);
+-	tp->tv_nsec = rem;
+-}
+-
+ /**
+  * tracing_is_enabled - Show if global_trace has been disabled
+  *
+-- 
+2.17.1
+

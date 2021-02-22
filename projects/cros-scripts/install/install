@@ -1,0 +1,7 @@
+cros-boot-keys:cros-boot-keys
+cros-boot-prepare:cros-boot-prepare
+cros-boot-setup:cros-boot-setup
+cros-ec-setup:cros-ec-setup
+cros-kernel-prepare:cros-kernel-prepare
+cros-kernel-setup:cros-kernel-setup
+cros-medium-setup:cros-medium-setup

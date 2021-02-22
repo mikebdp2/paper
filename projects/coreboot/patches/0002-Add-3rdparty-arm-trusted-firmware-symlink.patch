@@ -1,0 +1,23 @@
+From 513141483c7bb36eeb442f17d8dc2abfa54bc177 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 5 Apr 2017 22:02:10 +0200
+Subject: [PATCH 2/3] Add 3rdparty arm-trusted-firmware symlink
+
+Change-Id: If61a9608e08f3f9a7893b2c5ba12ad746e724fd9
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ 3rdparty/arm-trusted-firmware | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 120000 3rdparty/arm-trusted-firmware
+
+diff --git a/3rdparty/arm-trusted-firmware b/3rdparty/arm-trusted-firmware
+new file mode 120000
+index 0000000000..a18748ba88
+--- /dev/null
++++ b/3rdparty/arm-trusted-firmware
+@@ -0,0 +1 @@
++../../arm-trusted-firmware/
+\ No newline at end of file
+-- 
+2.17.1
+

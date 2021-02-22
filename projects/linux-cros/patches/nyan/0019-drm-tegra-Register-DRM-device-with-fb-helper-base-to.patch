@@ -1,0 +1,27 @@
+From ef0f651164aee74141d8ed65c7f5a8e8ea5cadd7 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 1 Sep 2018 17:34:31 +0200
+Subject: [PATCH 19/19] drm/tegra: Register DRM device with fb helper base to
+ avoid crash
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ drivers/gpu/drm/tegra/fb.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/tegra/fb.c b/drivers/gpu/drm/tegra/fb.c
+index 3547b222c440..8730ee970cc5 100644
+--- a/drivers/gpu/drm/tegra/fb.c
++++ b/drivers/gpu/drm/tegra/fb.c
+@@ -432,6 +432,8 @@ int tegra_drm_fb_init(struct drm_device *drm)
+ 	struct tegra_drm *tegra = drm->dev_private;
+ 	int err;
+ 
++	tegra->fbdev->base.dev = drm;
++
+ 	err = tegra_fbdev_init(tegra->fbdev, 32, drm->mode_config.num_crtc,
+ 			       drm->mode_config.num_connector);
+ 	if (err < 0)
+-- 
+2.18.0
+

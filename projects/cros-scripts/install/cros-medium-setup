@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+KERNEL_PARTITION_INDEX=1
+ROOTFS_PARTITION_INDEX=2
+
+# Size in blocks (512 B)
+GPT_SIZE=34
+KERNEL_SIZE=65536
+
+usage() {
+	printf "$executable [action] [storage] [rootfs tarball|kernel files] (medium)\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  partitions - Setup partitions on storage\n" >&2
+	printf "  rootfs - Install rootfs tarball to storage\n" >&2
+
+	usage_storage_common
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_storage
+	usage_variables_partitions
+	printf "  VBOOT_TOOLS_PATH - Path to vboot tools\n" >&2
+}
+
+partitions() {
+	local storage_path=$1
+
+	local storage_rootfs_path
+	local start
+	local size
+
+	printf "Configuration summary:\n"
+	printf "  Storage path: $storage_path\n\n"
+
+	storage_affect_confirm "$storage_path"
+
+	partitions_unmount "$storage_path"
+
+	fdisk_arguments=( "g" "w" )
+	partitions_create_table "$storage_path" "${fdisk_arguments[@]}"
+
+	cgpt create "$storage_path"
+
+	start=$GPT_SIZE
+	size=$KERNEL_SIZE
+	cgpt add -b "$start" -s "$size" -P 1 -S 1 -t kernel -l kernel "$storage_path"
+
+	start=$(( $start + $size ))
+	size=$( cgpt show "$storage_path" | grep "Sec GPT table" | sed "s/[[:space:]]*\([0-9]*\).*/\1/g" )
+	size=$(( $size - $start ))
+	cgpt add -b "$start" -s "$size" -t rootfs -l rootfs "$storage_path"
+
+	sync
+
+	blockdev --rereadpt "$storage_path" || partprobe "$storage_path"
+
+	storage_rootfs_path=$( storage_partition_path "$storage_path" "$ROOTFS_PARTITION_INDEX" )
+	# Unset some ext4 features for compatibility with the 3.10 nyan cros linux.
+	partition_create_ext4 "$storage_rootfs_path" "^64bit,^metadata_csum,uninit_bg"
+
+	printf "\nPartitions setup completed\n"
+}
+
+rootfs() {
+	local storage_path=$1
+	local rootfs_tarball_path=$2
+
+	rootfs_install_common "$storage_path" "$rootfs_tarball_path" "$ROOTFS_PARTITION_INDEX"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+
+	if [ -n "$VBOOT_TOOLS_PATH" ]
+	then
+		PATH="$PATH:$VBOOT_TOOLS_PATH"
+	fi
+}
+
+cros_medium_setup() {
+	local action=$1
+	local storage_path=$2
+	local rootfs_tarball_path=$3
+	local kernel_files_path=$3
+	local medium=$4
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$storage_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	case $action in
+	"partitions")
+		partitions_requirements_common
+		requirements "cgpt"
+		partitions "$storage_path"
+		;;
+	"rootfs")
+		if [ -z "$rootfs_tarball_path" ]
+		then
+			usage
+			exit 1
+		fi
+
+		rootfs_requirements_common
+		rootfs "$storage_path" "$rootfs_tarball_path"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+cros_medium_setup "$@"

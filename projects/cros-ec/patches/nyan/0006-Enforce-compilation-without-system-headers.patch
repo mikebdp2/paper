@@ -1,0 +1,27 @@
+From 9dba576a27a8158b719b92afc974d05a45236019 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 20 Jul 2016 16:26:32 +0200
+Subject: [PATCH 6/7] Enforce compilation without system headers
+
+This is based on commit bc404c94b4ab1e6a62e607fd7ef034aa31d6388e
+(Enforce compilation without system headers)
+---
+ Makefile.toolchain | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile.toolchain b/Makefile.toolchain
+index dd0ebb217..47991e183 100644
+--- a/Makefile.toolchain
++++ b/Makefile.toolchain
+@@ -19,7 +19,7 @@ BUILDCC?=gcc
+ HOSTCC?=$(HOST_CROSS_COMPILE)gcc
+ 
+ CFLAGS_WARN=-Wall -Werror -Wundef -Wstrict-prototypes -Wno-trigraphs      \
+-            -fno-strict-aliasing -fno-common                              \
++            -fno-strict-aliasing -fno-common -ffreestanding -fno-builtin  \
+             -Werror-implicit-function-declaration -Wno-format-security    \
+             -fno-delete-null-pointer-checks -Wdeclaration-after-statement \
+             -Wno-pointer-sign -fno-strict-overflow -fconserve-stack
+-- 
+2.18.0
+

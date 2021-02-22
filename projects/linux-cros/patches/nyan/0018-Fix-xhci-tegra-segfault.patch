@@ -1,0 +1,25 @@
+From e499c6b7b522b25de4b6b9a83d3980f73cb6f1bd Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Thu, 4 Jan 2018 15:30:06 +0100
+Subject: [PATCH 18/19] Fix xhci-tegra segfault
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ drivers/usb/host/xhci-tegra.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/usb/host/xhci-tegra.c b/drivers/usb/host/xhci-tegra.c
+index e2af925923dc..f862dbba4934 100644
+--- a/drivers/usb/host/xhci-tegra.c
++++ b/drivers/usb/host/xhci-tegra.c
+@@ -1129,7 +1129,6 @@ static void init_firmware_done(const struct firmware *fw, void *context)
+ err_firmware_done:
+ 	release_firmware(fw);
+ 	mutex_unlock(&tegra->sync_lock);
+-	platform_device_unregister(tegra->pdev);
+ }
+ 
+ static int init_firmware(struct tegra_xhci_hcd *tegra)
+-- 
+2.18.0
+

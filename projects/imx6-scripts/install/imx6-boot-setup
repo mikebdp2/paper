@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Size in blocks (512 B)
+BOOT_OFFSET=2
+BOOT_SIZE=2048
+
+usage() {
+	printf "$executable [action] [storage] [boot image]\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  install - Install boot image to storage\n" >&2
+	printf "  extract - Extract boot image from storage\n" >&2
+
+	usage_storage_common
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_storage
+}
+
+install() {
+	local storage_path=$1
+	local boot_image_path=$2
+
+	printf "Configuration summary:\n"
+	printf "  Storage path: $storage_path\n"
+	printf "  Boot image path: $boot_image_path\n\n"
+
+	storage_affect_confirm "$storage_path"
+
+	dd if="$boot_image_path" of="$storage_path" bs="$BLOCK_SIZE" seek="$BOOT_OFFSET"
+	sync
+
+	printf "\nBoot installation completed\n"
+}
+
+extract() {
+	local storage_path=$1
+	local boot_image_path=$2
+
+	printf "Configuration summary:\n"
+	printf "  Storage path: $storage_path\n"
+	printf "  Boot image path: $boot_image_path\n\n"
+
+	path_overwrite_confirm "$boot_image_path"
+
+	size=$(( $BOOT_SIZE - $BOOT_OFFSET ))
+	dd if="$storage_path" of="$boot_image_path" bs="$BLOCK_SIZE" skip="$BOOT_OFFSET" count="$size"
+	sync
+
+	printf "\nBoot extraction completed\n"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+}
+
+imx6_boot_setup() {
+	local action=$1
+	local storage_path=$2
+	local boot_image_path=$3
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$storage_path" ] || [ -z "$boot_image_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	case $action in
+	"install")
+		requirements "dd"
+		install "$storage_path" "$boot_image_path"
+		;;
+	"extract")
+		requirements "dd"
+		extract "$storage_path" "$boot_image_path"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+imx6_boot_setup "$@"

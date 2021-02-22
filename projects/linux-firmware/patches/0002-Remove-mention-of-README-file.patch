@@ -1,0 +1,26 @@
+From 67975c198bda64cce93c9c7a44a3e23cb2d881c7 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 8 Oct 2017 20:39:45 +0200
+Subject: [PATCH 2/2] Remove mention of README file
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ check_whence.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/check_whence.py b/check_whence.py
+index f83fb19..4561ccb 100755
+--- a/check_whence.py
++++ b/check_whence.py
+@@ -32,7 +32,7 @@ def main():
+     whence_list = list(list_whence())
+     known_files = set(name for name in whence_list if not name.endswith('/')) | \
+                   set(['check_whence.py', 'configure', 'Makefile',
+-                       'README', 'WHENCE'])
++                       'WHENCE'])
+     known_prefixes = set(name for name in whence_list if name.endswith('/'))
+     git_files = set(list_git())
+ 
+-- 
+2.16.2
+

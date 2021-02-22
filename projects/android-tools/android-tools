@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# Copyright (C) 2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+ANDROID_TOOLS_REPOSITORIES=(
+	"https://android.googlesource.com/platform/system/core"
+	"https://android.googlesource.com/platform/system/extras"
+	"https://android.googlesource.com/platform/external/f2fs-tools"
+	"https://android.googlesource.com/platform/external/selinux"
+)
+
+ANDROID_TOOLS_PROJECTS=(
+	"core/base"
+	"core/libcutils"
+	"core/libutils"
+	"core/liblog"
+	"core/libziparchive"
+	"core/libsparse"
+	"extras/f2fs_utils"
+	"core/fastboot"
+)
+
+usage() {
+	project_usage_actions "$project"
+}
+
+download() {
+	local repository=$project
+	local git_repository
+	local name
+
+	project_action_projects "$action" "$project" "$@"
+
+	for git_repository in "${ANDROID_TOOLS_REPOSITORIES[@]}"
+	do
+		name=$( basename "$git_repository" )
+		project_download_git "$project" "$repository/$name" "$git_repository" "$name"
+	done
+}
+
+download_check() {
+	local repository=$project
+	local git_repository
+	local name
+
+	for git_repository in "${ANDROID_TOOLS_REPOSITORIES[@]}"
+	do
+		name=$( basename "$git_repository" )
+		project_download_check_git "$project" "$repository/$name" "$git_repository" "$name"
+	done
+}
+
+extract() {
+	local repository=$project
+
+	project_action_projects "$action" "$project" "$@"
+
+	project_extract "$project" "$@"
+}
+
+extract_check() {
+	local repository=$project
+
+	project_extract_check "$project" "$@"
+}
+
+update() {
+	local repository=$project
+	local git_repository
+	local name
+
+	project_action_projects "$action" "$project" "$@"
+
+	for git_repository in "${ANDROID_TOOLS_REPOSITORIES[@]}"
+	do
+		name=$( basename "$git_repository" )
+		project_update_git "$project" "$repository/$name" "$name"
+	done
+}
+
+update_check() {
+	local repository=$project
+	local git_repository
+	local name
+
+	for git_repository in "${ANDROID_TOOLS_REPOSITORIES[@]}"
+	do
+		name=$( basename "$git_repository" )
+		project_update_check_git "$project" "$repository/$name" "$name"
+	done
+}
+
+build() {
+	local repository=$project
+
+	project_action_projects "$action" "$project" "$@"
+
+	project_sources_directory_missing_empty_error "$project" "$repository" "$@"
+
+	local sources_path=$( project_sources_path "$project" "$repository" "$@" )
+	local build_path=$( project_build_path "$project" "$@" )
+
+	if git_project_check "$repository"
+	then
+		git_project_checkout "$project" "$repository" "$@"
+	fi
+
+	for build_project in "${ANDROID_TOOLS_PROJECTS[@]}"
+	do
+		mkdir -p "$build_path/$build_project"
+
+		make -C "$sources_path/$build_project" BUILD="$build_path/$build_project" INSTALL=$build_path install
+	done
+}
+
+build_check() {
+	project_build_check "$project" "$@"
+}
+
+install() {
+	project_action_projects "$action" "$project" "$@"
+
+	project_install "$project" "$@"
+}
+
+install_check() {
+	project_install_check "$project" "$@"
+}
+
+release() {
+	local repository=$project
+
+	project_action_projects "$action" "$project" "$@"
+
+	project_release_install_archive "$project" "$TOOLS" "$@"
+
+	project_release_sources_git "$project" "$repository" "$@"
+}
+
+release_check() {
+	local repository=$project
+
+	project_release_install_archive_check "$project" "$TOOLS" "$@"
+
+	project_release_check_sources_git "$project" "$repository" "$@"
+}
+
+clean() {
+	project_action_projects "$action" "$project" "$@"
+
+	project_clean "$project" "$@"
+}

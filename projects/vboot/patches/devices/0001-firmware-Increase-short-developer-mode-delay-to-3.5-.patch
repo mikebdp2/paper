@@ -1,0 +1,31 @@
+From 8060ed5c775b76b03966f4b45c4d6634ee3c5f55 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 21:47:28 +0200
+Subject: [PATCH 1/6] firmware: Increase short developer mode delay to 3.5
+ seconds
+
+Change-Id: I8bf110695060a16d71320fbcc81a37c4cbe7139a
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ firmware/lib/vboot_audio.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/firmware/lib/vboot_audio.c b/firmware/lib/vboot_audio.c
+index 42a50798..85e2037a 100644
+--- a/firmware/lib/vboot_audio.c
++++ b/firmware/lib/vboot_audio.c
+@@ -53,9 +53,9 @@ int vb2_audio_looping(void)
+ {
+ 	uint64_t now = VbExGetTimer() - open_time;
+ 
+-	/* If we're using short delay, wait 2 seconds and don't beep */
++	/* If we're using short delay, wait 3.5 seconds and don't beep */
+ 	if (audio_use_short)
+-		return (now < 2000 * TICKS_PER_MSEC);
++		return (now < 3500 * TICKS_PER_MSEC);
+ 
+ 	/* Otherwise, beep at 20 and 20.5 seconds */
+ 	if ((beep_count == 0 && now > 20000 * TICKS_PER_MSEC) ||
+-- 
+2.17.1
+

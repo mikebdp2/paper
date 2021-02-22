@@ -1,0 +1,9 @@
+/build/
+/install/
+/release/
+/sources/
+/paper.conf
+.version
+.revision
+.tarfiles
+.epoch

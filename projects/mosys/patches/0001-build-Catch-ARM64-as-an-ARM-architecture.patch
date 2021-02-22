@@ -1,0 +1,33 @@
+From a114132dd8d623f1be2ca4c9eee0e73ea7274f07 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 2 Jun 2018 22:18:00 +0200
+Subject: [PATCH] build: Catch ARM64 as an ARM architecture
+
+This adds a rule to properly catch the arm64 arch option as an ARM
+architecture.
+
+BUG=None
+BRANCH=None
+TEST=Build mosys on a native aarch64 userspace
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ meson.build | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/meson.build b/meson.build
+index 20dcb3e..4068d06 100644
+--- a/meson.build
++++ b/meson.build
+@@ -23,7 +23,7 @@ if arch == 'x86' or arch == 'x86_64' or arch == 'amd64'
+   conf_data.set('CONFIG_PLATFORM_ARCH_X86', 1)
+ elif arch == 'mip'
+   conf_data.set('CONFIG_PLATFORM_ARCH_MIPSEL', 1)
+-elif arch == 'arm'
++elif arch == 'arm' or arch == 'arm64'
+   conf_data.set('CONFIG_PLATFORM_ARCH_ARMEL', 1)
+ endif
+ 
+-- 
+2.17.0
+

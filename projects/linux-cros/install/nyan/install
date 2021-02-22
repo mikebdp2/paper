@@ -1,0 +1,8 @@
+arch:arch
+bootloader:bootloader
+cmdline-emmc:cmdline-emmc
+cmdline-mmc:cmdline-mmc
+cmdline-usb:cmdline-usb
+device-tree:device-tree
+kernel:kernel
+media:media

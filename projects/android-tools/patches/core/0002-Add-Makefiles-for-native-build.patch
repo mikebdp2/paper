@@ -1,0 +1,655 @@
+From ac7df313fab8e01a513d2a9d69b03b09fa75a900 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 8 Jul 2018 12:08:41 +0200
+Subject: [PATCH 2/2] Add Makefiles for native build
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ base/Makefile          | 84 +++++++++++++++++++++++++++++++++++++++
+ fastboot/Makefile      | 89 ++++++++++++++++++++++++++++++++++++++++++
+ libcutils/Makefile     | 87 +++++++++++++++++++++++++++++++++++++++++
+ liblog/Makefile        | 89 ++++++++++++++++++++++++++++++++++++++++++
+ libsparse/Makefile     | 82 ++++++++++++++++++++++++++++++++++++++
+ libutils/Makefile      | 78 ++++++++++++++++++++++++++++++++++++
+ libziparchive/Makefile | 78 ++++++++++++++++++++++++++++++++++++
+ 7 files changed, 587 insertions(+)
+ create mode 100644 base/Makefile
+ create mode 100644 fastboot/Makefile
+ create mode 100644 libcutils/Makefile
+ create mode 100644 liblog/Makefile
+ create mode 100644 libsparse/Makefile
+ create mode 100644 libutils/Makefile
+ create mode 100644 libziparchive/Makefile
+
+diff --git a/base/Makefile b/base/Makefile
+new file mode 100644
+index 000000000..709bb9c12
+--- /dev/null
++++ b/base/Makefile
+@@ -0,0 +1,84 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libbase.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C =
++SOURCES_CPP = file.cpp \
++	logging.cpp \
++	parsenetaddress.cpp \
++	stringprintf.cpp \
++	strings.cpp \
++	errors_unix.cpp \
++	test_utils.cpp
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -DADB_HOST=1 -Iinclude -I../include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/fastboot/Makefile b/fastboot/Makefile
+new file mode 100644
+index 000000000..06d96a3fc
+--- /dev/null
++++ b/fastboot/Makefile
+@@ -0,0 +1,89 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = fastboot
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C =
++SOURCES_CPP = protocol.cpp \
++	engine.cpp \
++	bootimg_utils.cpp \
++	fastboot.cpp \
++	util.cpp \
++	fs.cpp \
++	usb_linux.cpp \
++	../adb/diagnose_usb.cpp \
++	socket.cpp \
++	tcp.cpp \
++	udp.cpp
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -DFASTBOOT_VERSION="\"android-8.1.0_r33\"" -D_GNU_SOURCE -D_XOPEN_SOURCE=700 -DUSE_F2FS -I../base/include -I../include -I../adb -I../libsparse/include -I../mkbootimg -I../../extras/ext4_utils/include -I../../extras/f2fs_utils -I../libziparchive/include
++LDFLAGS = -lz -lpcre2-8 -lpthread -ldl -L$(INSTALL) -lbase -lcutils -lutils -llog -lzip -lsparse -lf2fs
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " LINK   $@"
++	@$(CPP) -o $@ $(BUILD_OBJECTS) $(LDFLAGS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/libcutils/Makefile b/libcutils/Makefile
+new file mode 100644
+index 000000000..465db3b4d
+--- /dev/null
++++ b/libcutils/Makefile
+@@ -0,0 +1,87 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libcutils.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C = load_file.c \
++	socket_local_client_unix.c \
++	socket_network_client_unix.c \
++	socket_local_server_unix.c \
++	socket_inaddr_any_server_unix.c \
++	threads.c \
++	canned_fs_config.c
++SOURCES_CPP = android_get_control_file.cpp \
++	sockets_unix.cpp \
++	sockets.cpp \
++	fs_config.cpp
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -D_GNU_SOURCE -Iinclude -I../include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/liblog/Makefile b/liblog/Makefile
+new file mode 100644
+index 000000000..5edb27915
+--- /dev/null
++++ b/liblog/Makefile
+@@ -0,0 +1,89 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = liblog.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C = log_event_write.c \
++	fake_log_device.c \
++	log_event_list.c \
++	logger_write.c \
++	config_write.c \
++	config_read.c \
++	logger_lock.c \
++	local_logger.c \
++	fake_writer.c \
++	logger_name.c \
++	stderr_write.c \
++	logprint.c
++SOURCES_CPP =
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -DLIBLOG_LOG_TAG=1006 -D_XOPEN_SOURCE=700 -DFAKE_LOG_DEVICE=1 -I../log/include -I../include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/libsparse/Makefile b/libsparse/Makefile
+new file mode 100644
+index 000000000..a6d08abdb
+--- /dev/null
++++ b/libsparse/Makefile
+@@ -0,0 +1,82 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libsparse.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C = backed_block.c \
++	output_file.c \
++	sparse.c \
++	sparse_crc32.c \
++	sparse_err.c
++SOURCES_CPP = sparse_read.cpp
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -Iinclude -I../base/include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/libutils/Makefile b/libutils/Makefile
+new file mode 100644
+index 000000000..87ef71825
+--- /dev/null
++++ b/libutils/Makefile
+@@ -0,0 +1,78 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libutils.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C =
++SOURCES_CPP = FileMap.cpp
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -I../include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/libziparchive/Makefile b/libziparchive/Makefile
+new file mode 100644
+index 000000000..a8b79113c
+--- /dev/null
++++ b/libziparchive/Makefile
+@@ -0,0 +1,78 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libzip.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C =
++SOURCES_CPP = zip_archive.cc
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cc=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cc=.d)
++
++# Compiler
++
++CFLAGS = -Iinclude -I../include -I../base/include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cc | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+-- 
+2.18.0
+

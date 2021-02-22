@@ -1,0 +1,7 @@
+coreboot
+crossgcc
+vboot
+arm-trusted-firmware
+libpayload
+depthcharge
+cros-ec

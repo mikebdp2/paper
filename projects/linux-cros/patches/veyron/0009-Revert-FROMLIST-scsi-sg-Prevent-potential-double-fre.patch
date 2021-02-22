@@ -1,0 +1,29 @@
+From a0e67589bf38d750863290db1b96da6851065528 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 3 Jan 2018 00:07:00 +0100
+Subject: [PATCH 09/19] Revert "FROMLIST: scsi: sg: Prevent potential double
+ frees in sg driver"
+
+This reverts commit de559be06bcebc919b8f05461528c8ba7cbedeea.
+---
+ drivers/scsi/sg.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/scsi/sg.c b/drivers/scsi/sg.c
+index 4c0116f4babd..b9ffd37c73d2 100644
+--- a/drivers/scsi/sg.c
++++ b/drivers/scsi/sg.c
+@@ -837,10 +837,8 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
+ 			return -ENXIO;
+ 		if (!access_ok(VERIFY_WRITE, p, SZ_SG_IO_HDR))
+ 			return -EFAULT;
+-		mutex_lock(&sfp->parentdp->open_rel_lock);
+ 		result = sg_new_write(sfp, filp, p, SZ_SG_IO_HDR,
+ 				 1, read_only, 1, &srp);
+-		mutex_unlock(&sfp->parentdp->open_rel_lock);
+ 		if (result < 0)
+ 			return result;
+ 		result = wait_event_interruptible(sfp->read_wait,
+-- 
+2.17.1
+

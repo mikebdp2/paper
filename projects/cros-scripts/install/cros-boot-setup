@@ -1,0 +1,213 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+DEVICES=("nyan" "veyron" "elm" "kevin")
+
+usage() {
+	printf "$executable [action] [boot image] (device)\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  install - Install boot image to storage\n" >&2
+	printf "  extract - Extract boot image from storage\n" >&2
+
+	printf "\nDevices:\n" >&2
+
+	for device in "${DEVICES[@]}"
+	do
+		printf "  $device\n" >&2
+	done
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_flasher
+	printf "  FLASHROM_CROS_PATH - Path to Chromium OS flashrom tool\n" >&2
+}
+
+servo() {
+	local boot_image_path=$1
+	local device=$2
+	local flasher=$3
+	local argument=$4
+
+	local servo_test
+
+	servo_test=$( dut-control "i2c_mux" 2>&1 | grep "Connection refused" || true )
+	if [ -n "$servo_test" ]
+	then
+		printf "Unable to connect to servo daemon\n" >&2
+		exit 1
+	fi
+
+	case $device in
+	"elm")
+		dut-control cold_reset:on
+		sleep 1
+		dut-control cold_reset:off
+		sleep 1
+		dut-control fw_wp_en:on spi2_buf_en:on spi2_buf_on_flex_en:on spi2_vref:pp1800 warm_reset:on
+		sleep 1
+
+		flashrom -p "$flasher" "$argument" "$boot_image_path"
+		dut-control fw_wp_en:off spi2_buf_en:off spi2_buf_on_flex_en:off spi2_vref:off warm_reset:off
+
+		sleep 1
+		dut-control cold_reset:on
+		sleep 1
+		dut-control cold_reset:off
+		;;
+	"kevin"|"nyan"*)
+		dut-control fw_wp_en:on spi2_buf_en:on spi2_buf_on_flex_en:on spi2_vref:pp1800 cold_reset:on
+		sleep 1
+		flashrom -p "$flasher" "$argument" "$boot_image_path"
+		dut-control fw_wp_en:off spi2_buf_en:off spi2_buf_on_flex_en:off spi2_vref:off cold_reset:off
+		;;
+	"veyron"*)
+		dut-control fw_wp_en:on spi2_buf_en:on spi2_buf_on_flex_en:on spi2_vref:pp3300 cold_reset:on
+		sleep 1
+		flashrom -p "$flasher" "$argument" "$boot_image_path"
+		dut-control fw_wp_en:off spi2_buf_en:off spi2_buf_on_flex_en:off spi2_vref:off cold_reset:off
+		;;
+	*)
+		flashrom -p "$flasher" "$argument" "$boot_image_path"
+		;;
+	esac
+}
+
+flash_flashrom() {
+	local boot_image_path=$1
+	local device=$2
+	local action=$3
+
+	local argument
+	local flasher
+
+	case $action in
+	"read")
+		argument="-r"
+		;;
+	"write")
+		argument="-w"
+		;;
+	esac
+
+	case $FLASHER in
+	"servo-v2")
+		flasher="ft2232_spi:type=servo-v2"
+		;;
+	esac
+
+	if [ -n "$flasher" ]
+	then
+		servo "$boot_image_path" "$device" "$flasher" "$argument"
+	else
+		flashrom -p "$FLASHER" "$argument" "$boot_image_path"
+	fi
+}
+
+install() {
+	local boot_image_path=$1
+	local device=$2
+	local method=$3
+
+	printf "Configuration summary:\n"
+	printf "  Boot image path: $boot_image_path\n"
+	printf "  Device: $device\n"
+	printf "  Method: $method\n\n"
+
+	case $method in
+	"flashrom")
+		flash_flashrom "$boot_image_path" "$device" "write"
+		;;
+	*)
+		return 1
+		;;
+	esac
+
+	printf "\nBoot installation completed\n"
+}
+
+extract() {
+	local boot_image_path=$1
+	local device=$2
+	local method=$3
+
+	printf "Configuration summary:\n"
+	printf "  Boot image path: $boot_image_path\n"
+	printf "  Device: $device\n"
+	printf "  Method: $method\n\n"
+
+	case $method in
+	"flashrom")
+		flash_flashrom "$boot_image_path" "$device" "read"
+		;;
+	*)
+		return 1
+		;;
+	esac
+
+	printf "\nBoot extraction completed\n"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+
+	if [ -n "$FLASHROM_CROS_PATH" ]
+	then
+		PATH="$FLASHROM_CROS_PATH:$PATH"
+	fi
+}
+
+cros_boot_setup() {
+	local action=$1
+	local boot_image_path=$2
+	local device=$3
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$boot_image_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	if [ -n "$FLASHER" ]
+	then
+		method="flashrom"
+		requirements "flashrom"
+	else
+		printf "No supported installation method found\n" >&2
+	fi
+
+	case $action in
+	"install")
+		install "$boot_image_path" "$device" "$method"
+		;;
+	"extract")
+		extract "$boot_image_path" "$device" "$method"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+cros_boot_setup "$@"

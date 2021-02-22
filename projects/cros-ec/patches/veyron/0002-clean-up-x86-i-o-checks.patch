@@ -1,0 +1,79 @@
+From 1238d6bd9358c98048c9e49748c61168e43430b7 Mon Sep 17 00:00:00 2001
+From: Mike Frysinger <vapier@chromium.org>
+Date: Thu, 16 Apr 2015 01:31:20 -0400
+Subject: [PATCH 02/14] clean up x86 i/o checks
+
+Rather than hardcode a specific mips toolchain, do a build-time test to
+see if the target is x86 based.
+
+BUG=chromium:443783
+TEST=link still includes comm-lpc
+TEST=arm64 omits comm-lpc
+BRANCH=none
+
+Change-Id: I0253df6cbe89bee231ec643dd6bb3498eb040708
+Reviewed-on: https://chromium-review.googlesource.com/265793
+Reviewed-by: Gwendal Grignou <gwendal@chromium.org>
+Commit-Queue: Mike Frysinger <vapier@chromium.org>
+Tested-by: Mike Frysinger <vapier@chromium.org>
+---
+ util/build.mk   | 2 --
+ util/comm-lpc.c | 5 +++++
+ util/ectool.c   | 3 ++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/util/build.mk b/util/build.mk
+index b389324ff..00782face 100644
+--- a/util/build.mk
++++ b/util/build.mk
+@@ -10,13 +10,11 @@ host-util-bin=ectool lbplay stm32mon ec_sb_firmware_update lbcc
+ build-util-bin=ec_uartd iteflash
+ 
+ comm-objs=$(util-lock-objs:%=lock/%) comm-host.o comm-dev.o
+-ifneq ($(HOSTCC),mipsel-cros-linux-gnu-gcc)
+ ifeq ($(CHIP),mec1322)
+ comm-objs+=comm-mec1322.o
+ else
+ comm-objs+=comm-lpc.o
+ endif
+-endif
+ comm-objs+=comm-i2c.o
+ 
+ ectool-objs=ectool.o ectool_keyscan.o misc_util.o ec_flash.o $(comm-objs)
+diff --git a/util/comm-lpc.c b/util/comm-lpc.c
+index e7c5a25b5..54f16b3ff 100644
+--- a/util/comm-lpc.c
++++ b/util/comm-lpc.c
+@@ -3,6 +3,9 @@
+  * found in the LICENSE file.
+  */
+ 
++/* The I/O asm funcs exist only on x86. */
++#if defined(__i386__) || defined(__x86_64__)
++
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <sys/io.h>
+@@ -309,3 +312,5 @@ int comm_init_lpc(void)
+ 	ec_readmem = ec_readmem_lpc;
+ 	return 0;
+ }
++
++#endif
+diff --git a/util/ectool.c b/util/ectool.c
+index 9e69660c3..362f3f7a3 100644
+--- a/util/ectool.c
++++ b/util/ectool.c
+@@ -1077,7 +1077,8 @@ pd_flash_error:
+ 	return -1;
+ }
+ 
+-#ifdef __x86_64
++/* The I/O asm funcs exist only on x86. */
++#if defined(__i386__) || defined(__x86_64__)
+ #include <sys/io.h>
+ 
+ int cmd_serial_test(int argc, char *argv[])
+-- 
+2.15.0
+

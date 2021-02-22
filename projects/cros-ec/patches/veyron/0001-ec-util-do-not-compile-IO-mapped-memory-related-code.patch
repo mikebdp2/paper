@@ -1,0 +1,114 @@
+From 25d1d79dd371ec56885b9c2a376ec459f8abf1fe Mon Sep 17 00:00:00 2001
+From: Gwendal Grignou <gwendal@chromium.org>
+Date: Thu, 18 Dec 2014 16:36:00 -0800
+Subject: [PATCH 01/14] ec util: do not compile IO mapped memory related code
+ for mips.
+
+MIPS host CPU does not access IO registers using a separate address space.
+Remove for support of LPC for this host architecture.
+
+Confine x86 function to Intel Architecture only.
+
+BRANCH=none
+TEST=Compile: Test on ARM, MIPS and X86: using emerge... ec-utils.
+BUG=chromium:443783
+
+Change-Id: I9d4276ec3588037adfcff96e596bbe8be74f22fd
+Signed-off-by: Gwendal Grignou <gwendal@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/236687
+Reviewed-by: Vic Yang <victoryang@chromium.org>
+Reviewed-by: Randall Spangler <rspangler@chromium.org>
+---
+ util/build.mk |  2 ++
+ util/ectool.c | 36 ++++++++++++++++++++++++------------
+ 2 files changed, 26 insertions(+), 12 deletions(-)
+
+diff --git a/util/build.mk b/util/build.mk
+index 00782face..b389324ff 100644
+--- a/util/build.mk
++++ b/util/build.mk
+@@ -10,11 +10,13 @@ host-util-bin=ectool lbplay stm32mon ec_sb_firmware_update lbcc
+ build-util-bin=ec_uartd iteflash
+ 
+ comm-objs=$(util-lock-objs:%=lock/%) comm-host.o comm-dev.o
++ifneq ($(HOSTCC),mipsel-cros-linux-gnu-gcc)
+ ifeq ($(CHIP),mec1322)
+ comm-objs+=comm-mec1322.o
+ else
+ comm-objs+=comm-lpc.o
+ endif
++endif
+ comm-objs+=comm-i2c.o
+ 
+ ectool-objs=ectool.o ectool_keyscan.o misc_util.o ec_flash.o $(comm-objs)
+diff --git a/util/ectool.c b/util/ectool.c
+index 9ba8de919..9e69660c3 100644
+--- a/util/ectool.c
++++ b/util/ectool.c
+@@ -10,7 +10,6 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/io.h>
+ #include <unistd.h>
+ 
+ #include "battery.h"
+@@ -1078,6 +1077,8 @@ pd_flash_error:
+ 	return -1;
+ }
+ 
++#ifdef __x86_64
++#include <sys/io.h>
+ 
+ int cmd_serial_test(int argc, char *argv[])
+ {
+@@ -1099,6 +1100,28 @@ int cmd_serial_test(int argc, char *argv[])
+ }
+ 
+ 
++int cmd_port_80_flood(int argc, char *argv[])
++{
++	int i;
++
++	for (i = 0; i < 256; i++)
++		outb(i, 0x80);
++	return 0;
++}
++#else
++int cmd_serial_test(int argc, char *argv[])
++{
++	printf("x86 specific command\n");
++	return -1;
++}
++
++int cmd_port_80_flood(int argc, char *argv[])
++{
++	printf("x86 specific command\n");
++	return -1;
++}
++#endif
++
+ int read_mapped_temperature(int id)
+ {
+ 	int rv;
+@@ -4961,17 +4984,6 @@ int cmd_console(int argc, char *argv[])
+ 	printf("\n");
+ 	return 0;
+ }
+-
+-/* Flood port 80 with byte writes */
+-int cmd_port_80_flood(int argc, char *argv[])
+-{
+-	int i;
+-
+-	for (i = 0; i < 256; i++)
+-		outb(i, 0x80);
+-	return 0;
+-}
+-
+ struct param_info {
+ 	const char *name;	/* name of this parameter */
+ 	const char *help;	/* help message */
+-- 
+2.15.0
+

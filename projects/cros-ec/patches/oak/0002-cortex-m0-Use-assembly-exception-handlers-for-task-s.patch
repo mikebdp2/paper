@@ -1,0 +1,156 @@
+From 5e8cc40e81147a619028824f9c7333b833da1e18 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 22 Jul 2017 17:49:39 +0300
+Subject: [PATCH 2/3] cortex-m0: Use assembly exception handlers for task
+ switching
+
+The way Cortex processors handle exceptions allows writing exception
+routines directly in C, as return from exception is handled by providing
+a special value for the link register.
+
+However, it is not safe to do this when doing context switching. In
+particular, C handlers may push some general-purpose registers that
+are used by the handler and pop them later, even when context switch
+has happened in the meantime. While the processor will restore {r0-r3}
+from the stack when returning from an exception, the C handler code
+may push, use and pop another register, such as r4.
+
+It turns out that GCC 4.8 would generally only use r3 in svc_handler and
+pendsv_handler, but newer versions tend to use r4, thus clobbering r4
+that was restored from the context switch and leading up to a fault
+when r4 is used by the task code.
+
+An occurrence of this behaviour takes place with GCC > 4.8 in __wait_evt,
+where "me" is stored in r4, which gets clobbered after an exception
+triggers pendsv_handler. The exception handler uses r4 internally, does
+a context switch and then restores the previous value of r4, which is
+not restored by the processor's internal, thus clobbering r4.
+This ends up with the following assertion failure:
+'tskid < TASK_ID_COUNT' in timer_cancel() at common/timer.c:137
+
+For this reason, it is safer to have assembly routines for exception
+handlers that do context switching.
+
+BUG=chromium:631514
+BRANCH=None
+TEST=Build and run speedy EC with a recent GCC version
+
+Change-Id: Ib068bc12ce2204aee3e0f563efcb94f15aa87013
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ core/cortex-m0/switch.S | 35 +++++++++++++++++++++++++++++++++++
+ core/cortex-m0/task.c   | 27 +--------------------------
+ 2 files changed, 36 insertions(+), 26 deletions(-)
+
+diff --git a/core/cortex-m0/switch.S b/core/cortex-m0/switch.S
+index 95ea29e76..9c2c72c90 100644
+--- a/core/cortex-m0/switch.S
++++ b/core/cortex-m0/switch.S
+@@ -7,6 +7,8 @@
+ 
+ #include "config.h"
+ 
++#define CPU_SCB_ICSR		0xe000ed04
++
+ .text
+ 
+ .syntax unified
+@@ -79,3 +81,36 @@ __task_start:
+   movs r0, #1             @ set to EC_ERROR_UNKNOWN
+   bx lr
+ 
++/**
++ * SVC exception handler
++ */
++.global svc_handler
++.thumb_func
++svc_handler:
++  push {r3, lr}              @ save link register and keep stack aligned
++  bl __svc_handler           @ call svc handler helper
++  ldr r3,=current_task       @ load the current task's address
++  ldr r1, [r3]               @ load the current task
++  cmp r0, r1                 @ compare with previous task returned by helper
++  beq svc_handler_return     @ return if they are the same
++  bl __switchto              @ context switch to the next task
++svc_handler_return:
++  pop {r3, pc}               @ return from exception or return to caller
++
++/**
++ * PendSVC exception handler
++ */
++.global pendsv_handler
++.thumb_func
++pendsv_handler:
++  push {r3, lr}              @ save link register and keep stack aligned
++  ldr r0, =#CPU_SCB_ICSR     @ load CPU_SCB_ICSR's address
++  movs r1, #1                @ prepare left shift (1 << 27)
++  lsls r1, #27               @ shift the bit
++  str r1, [r0]               @ clear pending flag
++  cpsid i                    @ ensure we have priority 0 during re-scheduling
++  movs r1, #0                @ desched nothing
++  movs r0, #0                @ resched nothing
++  bl svc_handler             @ re-schedule the highest priority task
++  cpsie i                    @ leave priority 0
++  pop {r3, pc}               @ return from exception
+diff --git a/core/cortex-m0/task.c b/core/cortex-m0/task.c
+index b013fe82f..111f08220 100644
+--- a/core/cortex-m0/task.c
++++ b/core/cortex-m0/task.c
+@@ -57,7 +57,6 @@ static uint32_t task_switches;   /* Number of times active task changed */
+ static uint32_t irq_dist[CONFIG_IRQ_COUNT];  /* Distribution of IRQ calls */
+ #endif
+ 
+-extern void __switchto(task_ *from, task_ *to);
+ extern int __task_start(int *task_stack_ready);
+ 
+ #ifndef CONFIG_LOW_POWER_IDLE
+@@ -120,7 +119,7 @@ uint8_t task_stacks[0
+ /* Reserve space to discard context on first context switch. */
+ uint32_t scratchpad[17];
+ 
+-static task_ *current_task = (task_ *)scratchpad;
++task_ *current_task = (task_ *)scratchpad;
+ 
+ /*
+  * Bitmap of all tasks ready to be run.
+@@ -250,18 +249,6 @@ task_  __attribute__((noinline)) *__svc_handler(int desched, task_id_t resched)
+ 	return current;
+ }
+ 
+-void svc_handler(int desched, task_id_t resched)
+-{
+-	/*
+-	 * The layout of the this routine (and the __svc_handler companion one)
+-	 * ensures that we are getting the right tail call optimization from
+-	 * the compiler.
+-	 */
+-	task_ *prev = __svc_handler(desched, resched);
+-	if (current_task != prev)
+-		__switchto(prev, current_task);
+-}
+-
+ void __schedule(int desched, int resched)
+ {
+ 	register int p0 asm("r0") = desched;
+@@ -270,18 +257,6 @@ void __schedule(int desched, int resched)
+ 	asm("svc 0" : : "r"(p0), "r"(p1));
+ }
+ 
+-void pendsv_handler(void)
+-{
+-	/* Clear pending flag */
+-	CPU_SCB_ICSR = (1 << 27);
+-
+-	/* ensure we have priority 0 during re-scheduling */
+-	__asm__ __volatile__("cpsid i");
+-	/* re-schedule the highest priority task */
+-	svc_handler(0, 0);
+-	__asm__ __volatile__("cpsie i");
+-}
+-
+ #ifdef CONFIG_TASK_PROFILING
+ void task_start_irq_handler(void *excep_return)
+ {
+-- 
+2.17.1
+

@@ -1,0 +1,84 @@
+From 9a5a78a6f31cdeb454710676812bb4ae39ee3c2b Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Mon, 10 Aug 2015 23:53:48 +0200
+Subject: [PATCH 4/6] firmware: Separate screen and wait at device information
+ screen
+
+This blanks the screen (instead of redrawing it) at device information and
+waits for the user to press any key to come back to the developer mode screen.
+
+Change-Id: I16364e69ce5bbaba5689f9f7af29c593ddea8558
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ firmware/lib/vboot_display.c | 17 +++++++----------
+ firmware/lib/vboot_ui.c      | 12 ++++++++++++
+ 2 files changed, 19 insertions(+), 10 deletions(-)
+
+diff --git a/firmware/lib/vboot_display.c b/firmware/lib/vboot_display.c
+index 947fb42f..db9574e2 100644
+--- a/firmware/lib/vboot_display.c
++++ b/firmware/lib/vboot_display.c
+@@ -273,7 +273,7 @@ const char *RecoveryReasonString(uint8_t code)
+ 	return "We have no idea what this means";
+ }
+ 
+-#define DEBUG_INFO_SIZE 512
++#define DEBUG_INFO_SIZE 768
+ 
+ VbError_t VbDisplayDebugInfo(struct vb2_context *ctx)
+ {
+@@ -287,14 +287,8 @@ VbError_t VbDisplayDebugInfo(struct vb2_context *ctx)
+ 	VbError_t ret;
+ 	uint32_t i;
+ 
+-	/* Redisplay current screen to overwrite any previous debug output.
+-	 * Need to use VbDisplayMenu instead of VbDisplayScreen
+-	 * in order to ensure that the selected menu item is
+-	 * highlighted.  On a non-detachable screen, this will be a
+-	 * no-op.
+-	 */
+-	VbDisplayMenu(ctx, disp_current_screen, 1,
+-		      disp_current_index, disp_disabled_idx_mask);
++	/* Blank screen */
++	VbDisplayScreen(ctx, cparams, VB_SCREEN_BLANK, 1);
+ 
+ 	/* Add hardware ID */
+ 	VbGbbReadHWID(ctx, hwid, sizeof(hwid));
+@@ -401,7 +395,10 @@ VbError_t VbDisplayDebugInfo(struct vb2_context *ctx)
+ 	}
+ 
+ 	/* Make sure we finish with a newline */
+-	used += StrnAppend(buf + used, "\n", DEBUG_INFO_SIZE - used);
++	used += StrnAppend(buf + used, "\n\n", DEBUG_INFO_SIZE - used);
++
++	used += StrnAppend(buf + used, "Press any key to continue\n\n",
++			   DEBUG_INFO_SIZE - used);
+ 
+ 	/* TODO: add more interesting data:
+ 	 * - Information on current disks */
+diff --git a/firmware/lib/vboot_ui.c b/firmware/lib/vboot_ui.c
+index 58f634d8..ffc73c66 100644
+--- a/firmware/lib/vboot_ui.c
++++ b/firmware/lib/vboot_ui.c
+@@ -322,6 +322,18 @@ developer_mode_screen:
+ 				 "hold developer mode screen\n"));
+ 			hold = 1;
+ 			break;
++		case 0x09:
++			/* Ctrl+I = device information */
++			VBDEBUG(("VbBootDeveloper() - "
++				 "device info\n"));
++
++			hold = 1;
++			VbDisplayDebugInfo(ctx);
++
++			while (!VbExKeyboardRead()) ;
++
++			goto developer_mode_screen;
++			break;
+ 		case 0x0c:
+ 			VB2_DEBUG("VbBootDeveloper() - "
+ 				  "user pressed Ctrl+L; Try legacy boot\n");
+-- 
+2.17.1
+

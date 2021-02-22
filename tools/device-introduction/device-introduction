@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Copyright (C) 2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+arguments() {
+	local project=$1
+
+	if [ -z "$project" ]
+	then
+		ls -A "$root/$PROJECTS/" | while read project
+		do
+			echo "$project"
+		done
+	fi
+}
+
+usage() {
+	tool_usage_actions "$tool"
+	tool_usage_arguments "$tool" "$@"
+}
+
+execute() {
+	local project=$1
+	shift
+	local reference_device=$1
+
+	# This assumes that the repository is the project, which is not always the case.
+	local repository=$project
+
+	local project_path=$( project_path "$project" )
+
+	requirements "sort"
+
+	printf "Introducing a new device for project $project\n"
+
+	printf "Reference device target: "
+
+	if [ -n "$reference_device" ]
+	then
+		printf "$reference_device\n"
+	else
+		read reference_device
+	fi
+
+	printf "New device target: "
+
+	read new_device
+
+	(
+		cd "$project_path"
+
+		# Copy and adapt target directories first.
+		find -type d -name "$reference_device" | while read source
+		do
+			destination=$( echo "$source" | sed "s/$reference_device/$new_device/g" )
+			cp -r "$source" "$destination"
+
+			grep -r "$reference_device" "$destination" | sed "s/\([^:]*\):.*/\1/g" | sort | uniq | while read file
+			do
+				sed "s/$reference_device/$new_device/g" -i "$file"
+			done
+
+			git add -N "$destination"
+		done
+
+		# Add occurrences in relevant files.
+		grep -r "$reference_device" | sed "s/\([^:]*\):.*/\1/g" | grep -v "$reference_device"  | sort | uniq | while read file
+		do
+			line=$( grep "$reference_device" "$file" | sed "s/$reference_device/$new_device/g" )
+			echo "$line" >> "$file"
+			sort -o "$file" "$file"
+		done
+
+		printf "Changes summary:\n"
+		git --no-pager diff .
+	)
+}

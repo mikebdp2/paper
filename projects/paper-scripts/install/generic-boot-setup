@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Copyright (C) 2016-2018 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+usage() {
+	printf "$executable [action] [boot image]\n" >&2
+
+	printf "\nActions:\n" >&2
+	printf "  install - Install boot image to storage\n" >&2
+	printf "  extract - Extract boot image from storage\n" >&2
+
+	printf "\nEnvironment variables:\n" >&2
+	usage_variables_flasher
+	printf "  FLASHROM_PATH - Path to flashrom tool\n" >&2
+}
+
+install() {
+	local boot_image_path=$1
+	local method=$2
+
+	case $method in
+	"flashrom")
+		flashrom -p "$FLASHER" -w "$boot_image_path"
+		;;
+	*)
+		return 1
+		;;
+	esac
+
+	printf "\nBoot installation completed\n"
+}
+
+extract() {
+	local boot_image_path=$1
+	local method=$2
+
+	case $method in
+	"flashrom")
+		flashrom -p "$FLASHER" -r "$boot_image_path"
+		;;
+	*)
+		return 1
+		;;
+	esac
+
+	printf "\nBoot extraction completed\n"
+}
+
+setup() {
+	root=$( realpath "$( dirname "$0" )" )
+	executable=$( basename "$0" )
+
+	source "$root/common"
+
+	if [ -n "$FLASHROM_PATH" ]
+	then
+		PATH="$FLASHROM_PATH:$PATH"
+	fi
+}
+
+generic_boot_setup() {
+	local action=$1
+	local boot_image_path=$2
+
+	set -e
+
+	setup "$@"
+
+	if [ -z "$action" ] || [ -z "$boot_image_path" ]
+	then
+		usage
+		exit 1
+	fi
+
+	if [ -n "$FLASHER" ]
+	then
+		requirements "flashrom"
+		method="flashrom"
+	else
+		printf "No supported installation method found\n" >&2
+	fi
+
+	case $action in
+	"install")
+		install "$boot_image_path" "$method"
+		;;
+	"extract")
+		extract "$boot_image_path" "$method"
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+}
+
+generic_boot_setup "$@"

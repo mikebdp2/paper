@@ -1,0 +1,3 @@
+arch/arm64/boot/dts/rockchip/rk3399-gru-kevin-r5.dtb:rk3399-gru-kevin-r5.dtb
+arch/arm64/boot/dts/rockchip/rk3399-gru-kevin-r6.dtb:rk3399-gru-kevin-r6.dtb
+arch/arm64/boot/Image:Image

@@ -1,0 +1,4 @@
+docs/firmware-design.rst
+plat/hisilicon/hikey/hisi_dvfs.c
+plat/rockchip/rk3399/drivers/dram/dfs.c
+plat/rockchip/rk3399/drivers/m0/src/startup.c

@@ -1,0 +1,4 @@
+bootcmd-install:bootcmd-install
+loadaddr:loadaddr
+u-boot-tegra.bin:u-boot-tegra.bin
+u-boot-tegra-install.bin:u-boot-tegra-install.bin

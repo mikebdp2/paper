@@ -1,0 +1,51 @@
+From c87611de996a0cf91e56760cc555af92b8277a2a Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Wed, 13 Jun 2018 22:14:55 +0200
+Subject: [PATCH 4/6] vboot: Always turn the backlight on
+
+Change-Id: Ib9b2a0f0008fb388afd3b32fd5d772c229bb513c
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ src/vboot/callbacks/display.c | 1 +
+ src/vboot/screens.c           | 6 ++----
+ 2 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/src/vboot/callbacks/display.c b/src/vboot/callbacks/display.c
+index aec5f282..ccbf48c3 100644
+--- a/src/vboot/callbacks/display.c
++++ b/src/vboot/callbacks/display.c
+@@ -66,6 +66,7 @@ VbError_t VbExDisplayScreen(uint32_t screen_type, uint32_t locale,
+ 	char *msg;
+ 
+ 	graphics_init();
++	 backlight_update(1);
+ 
+ 	switch (screen_type) {
+ 	case VB_SCREEN_BLANK:
+diff --git a/src/vboot/screens.c b/src/vboot/screens.c
+index 1425997a..c2f2c628 100644
+--- a/src/vboot/screens.c
++++ b/src/vboot/screens.c
+@@ -1121,8 +1121,7 @@ int vboot_draw_screen(uint32_t screen, uint32_t locale)
+ 			return VBERROR_UNKNOWN;
+ 	}
+ 
+-	/* If the screen is blank, turn off the backlight; else turn it on. */
+-	backlight_update(VB_SCREEN_BLANK == screen ? 0 : 1);
++	backlight_update(1);
+ 
+ 	/* TODO: draw only locale dependent part if current_screen == screen */
+ 	/* setting selected_index value to 0xFFFFFFFF invalidates the field */
+@@ -1147,8 +1146,7 @@ int vboot_draw_ui(uint32_t screen, uint32_t locale,
+ 			return VBERROR_UNKNOWN;
+ 	}
+ 
+-	/* If the screen is blank, turn off the backlight; else turn it on. */
+-	backlight_update(screen == VB_SCREEN_BLANK ? 0 : 1);
++	backlight_update(1);
+ 
+ 	struct params p = { locale, selected_index,
+ 			    disabled_idx_mask, redraw_base };
+-- 
+2.18.0
+

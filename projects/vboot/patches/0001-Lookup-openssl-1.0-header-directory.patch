@@ -1,0 +1,25 @@
+From f7690f14bbe405e61a038f2655e295691dbc4213 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 2 Jul 2017 21:08:13 +0300
+Subject: [PATCH 1/4] Lookup openssl 1.0 header directory
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Makefile b/Makefile
+index 013c6d8a..126dc906 100644
+--- a/Makefile
++++ b/Makefile
+@@ -284,6 +284,7 @@ all: fwlib fwlib2x fwlib20 fwlib21 \
+ 
+ # Everything wants these headers.
+ INCLUDES += \
++	-isystem/usr/include/openssl-1.0 \
+ 	-Ifirmware/include \
+ 	-Ifirmware/lib/include \
+ 	-Ifirmware/lib/cgptlib/include \
+-- 
+2.15.1
+

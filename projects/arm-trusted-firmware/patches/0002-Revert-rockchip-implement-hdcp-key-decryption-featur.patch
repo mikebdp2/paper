@@ -1,0 +1,172 @@
+From d149164f296e7a4a3e286b8584cb028ff3e2c1ac Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sat, 2 Jun 2018 21:55:16 +0200
+Subject: [PATCH 2/3] Revert "rockchip: implement hdcp key decryption feature
+ for rk3399"
+
+This reverts commit 10301bf7eab9bffd04564ed4e935897eea43e2cb.
+---
+ plat/rockchip/rk3399/drivers/dp/cdn_dp.c | 46 -----------------------
+ plat/rockchip/rk3399/drivers/dp/cdn_dp.h | 47 ------------------------
+ plat/rockchip/rk3399/plat_sip_calls.c    | 12 ------
+ 3 files changed, 105 deletions(-)
+ delete mode 100644 plat/rockchip/rk3399/drivers/dp/cdn_dp.h
+
+diff --git a/plat/rockchip/rk3399/drivers/dp/cdn_dp.c b/plat/rockchip/rk3399/drivers/dp/cdn_dp.c
+index d0e59861..9fc623b9 100644
+--- a/plat/rockchip/rk3399/drivers/dp/cdn_dp.c
++++ b/plat/rockchip/rk3399/drivers/dp/cdn_dp.c
+@@ -4,10 +4,7 @@
+  * SPDX-License-Identifier: BSD-3-Clause
+  */
+ 
+-#include <cdn_dp.h>
+-#include <smcc.h>
+ #include <stdlib.h>
+-#include <string.h>
+ 
+ __asm__(
+ 	".pushsection .text.hdcp_handler, \"ax\", %progbits\n"
+@@ -20,46 +17,3 @@ __asm__(
+ 	".popsection\n"
+ );
+ 
+-static uint64_t *hdcp_key_pdata;
+-static struct cdn_dp_hdcp_key_1x key;
+-
+-int hdcp_handler(struct cdn_dp_hdcp_key_1x *key);
+-
+-uint64_t dp_hdcp_ctrl(uint64_t type)
+-{
+-	switch (type) {
+-	case HDCP_KEY_DATA_START_TRANSFER:
+-		memset(&key, 0x00, sizeof(key));
+-		hdcp_key_pdata = (uint64_t *)&key;
+-		return 0;
+-	case HDCP_KEY_DATA_START_DECRYPT:
+-		if (hdcp_key_pdata == (uint64_t *)(&key + 1))
+-			return hdcp_handler(&key);
+-		else
+-			return PSCI_E_INVALID_PARAMS;
+-	default:
+-		return SMC_UNK;
+-	}
+-}
+-
+-uint64_t dp_hdcp_store_key(uint64_t x1,
+-			   uint64_t x2,
+-			   uint64_t x3,
+-			   uint64_t x4,
+-			   uint64_t x5,
+-			   uint64_t x6)
+-{
+-	if (hdcp_key_pdata < (uint64_t *)&key ||
+-		hdcp_key_pdata + 6 > (uint64_t *)(&key + 1))
+-		return PSCI_E_INVALID_PARAMS;
+-
+-	hdcp_key_pdata[0] = x1;
+-	hdcp_key_pdata[1] = x2;
+-	hdcp_key_pdata[2] = x3;
+-	hdcp_key_pdata[3] = x4;
+-	hdcp_key_pdata[4] = x5;
+-	hdcp_key_pdata[5] = x6;
+-	hdcp_key_pdata += 6;
+-
+-	return 0;
+-}
+diff --git a/plat/rockchip/rk3399/drivers/dp/cdn_dp.h b/plat/rockchip/rk3399/drivers/dp/cdn_dp.h
+deleted file mode 100644
+index 3b9a1084..00000000
+--- a/plat/rockchip/rk3399/drivers/dp/cdn_dp.h
++++ /dev/null
+@@ -1,47 +0,0 @@
+-/*
+- * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
+- *
+- * SPDX-License-Identifier: BSD-3-Clause
+- */
+-
+-#ifndef __SOC_ROCKCHIP_RK3399_DP_H__
+-#define __SOC_ROCKCHIP_RK3399_DP_H__
+-#include <plat_private.h>
+-
+-enum {
+-	CDN_DP_HDCP_1X_KSV_LEN = 5,
+-	CDN_DP_HDCP_KSV_LEN = 8,
+-	CDN_DP_HDCP_RESERVED_LEN = 10,
+-	CDN_DP_HDCP_UID_LEN = 16,
+-	CDN_DP_HDCP_SHA_LEN = 20,
+-	CDN_DP_HDCP_DPK_LEN = 280,
+-	CDN_DP_HDCP_1X_KEYS_LEN	= 285,
+-	CDN_DP_HDCP_KEY_LEN = 326,
+-};
+-
+-struct cdn_dp_hdcp_key_1x {
+-	uint8_t ksv[CDN_DP_HDCP_KSV_LEN];
+-	uint8_t device_key[CDN_DP_HDCP_DPK_LEN];
+-	uint8_t sha1[CDN_DP_HDCP_SHA_LEN];
+-	uint8_t uid[CDN_DP_HDCP_UID_LEN];
+-	uint16_t seed;
+-	uint8_t reserved[CDN_DP_HDCP_RESERVED_LEN];
+-};
+-
+-#define HDCP_KEY_DATA_START_TRANSFER	0
+-#define HDCP_KEY_DATA_START_DECRYPT	1
+-#define HDCP_KEY_1X_STORE_DATA_ALIGN_SIZE	(6 * 64) / 8
+-
+-/* Checks the cdn_dp_hdcp_key_1x must be aligned on 6 x 64-bit word boundary */
+-CASSERT(sizeof(struct cdn_dp_hdcp_key_1x) % HDCP_KEY_1X_STORE_DATA_ALIGN_SIZE, \
+-	assert_hdcp_key_1x_store_data_align_size_mismatch);
+-
+-uint64_t dp_hdcp_ctrl(uint64_t type);
+-
+-uint64_t dp_hdcp_store_key(uint64_t x1,
+-			   uint64_t x2,
+-			   uint64_t x3,
+-			   uint64_t x4,
+-			   uint64_t x5,
+-			   uint64_t x6);
+-#endif
+diff --git a/plat/rockchip/rk3399/plat_sip_calls.c b/plat/rockchip/rk3399/plat_sip_calls.c
+index 2fbda673..a78b8b3f 100644
+--- a/plat/rockchip/rk3399/plat_sip_calls.c
++++ b/plat/rockchip/rk3399/plat_sip_calls.c
+@@ -4,7 +4,6 @@
+  * SPDX-License-Identifier: BSD-3-Clause
+  */
+ 
+-#include <cdn_dp.h>
+ #include <debug.h>
+ #include <dfs.h>
+ #include <mmio.h>
+@@ -24,9 +23,6 @@
+ #define DRAM_SET_PARAM		0x07
+ #define DRAM_SET_ODT_PD		0x08
+ 
+-#define RK_SIP_HDCP_CONTROL	0x82000009
+-#define RK_SIP_HDCP_KEY_DATA64	0xC200000A
+-
+ uint32_t ddr_smc_handler(uint64_t arg0, uint64_t arg1,
+ 			 uint64_t id, uint64_t arg2)
+ {
+@@ -56,17 +52,9 @@ uint64_t rockchip_plat_sip_handler(uint32_t smc_fid,
+ 				   void *handle,
+ 				   uint64_t flags)
+ {
+-	uint64_t x5, x6;
+-
+ 	switch (smc_fid) {
+ 	case RK_SIP_DDR_CFG:
+ 		SMC_RET1(handle, ddr_smc_handler(x1, x2, x3, x4));
+-	case RK_SIP_HDCP_CONTROL:
+-		SMC_RET1(handle, dp_hdcp_ctrl(x1));
+-	case RK_SIP_HDCP_KEY_DATA64:
+-		x5 = read_ctx_reg(get_gpregs_ctx(handle), CTX_GPREG_X5);
+-		x6 = read_ctx_reg(get_gpregs_ctx(handle), CTX_GPREG_X6);
+-		SMC_RET1(handle, dp_hdcp_store_key(x1, x2, x3, x4, x5, x6));
+ 	default:
+ 		ERROR("%s: unhandled SMC (0x%x)\n", __func__, smc_fid);
+ 		SMC_RET1(handle, SMC_UNK);
+-- 
+2.17.1
+

@@ -1,0 +1,4 @@
+coreboot default
+crossgcc default
+paper-coreboot
+u-boot default

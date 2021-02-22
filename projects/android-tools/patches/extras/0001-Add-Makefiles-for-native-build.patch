@@ -1,0 +1,196 @@
+From 575c5c36eec1b8d6a7447c93a1815c738876e3e0 Mon Sep 17 00:00:00 2001
+From: Paul Kocialkowski <contact@paulk.fr>
+Date: Sun, 8 Jul 2018 12:55:14 +0200
+Subject: [PATCH] Add Makefiles for native build
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ ext4_utils/Makefile | 88 +++++++++++++++++++++++++++++++++++++++++++++
+ f2fs_utils/Makefile | 80 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 168 insertions(+)
+ create mode 100644 ext4_utils/Makefile
+ create mode 100644 f2fs_utils/Makefile
+
+diff --git a/ext4_utils/Makefile b/ext4_utils/Makefile
+new file mode 100644
+index 00000000..f9a6c073
+--- /dev/null
++++ b/ext4_utils/Makefile
+@@ -0,0 +1,88 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libext4.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= .
++
++# Sources
++
++SOURCES_C = make_ext4fs.c \
++	ext4fixup.c \
++	ext4_utils.c \
++	allocate.c \
++	contents.c \
++	extent.c \
++	indirect.c \
++	sha1.c \
++	wipe.c \
++	crc16.c \
++	ext4_sb.c
++SOURCES_CPP =
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -D_GNU_SOURCE -Iinclude -I../../core/libsparse/include -I../../core/include -I../../selinux/libselinux/include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(OUTPUT_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+diff --git a/f2fs_utils/Makefile b/f2fs_utils/Makefile
+new file mode 100644
+index 00000000..11d74a24
+--- /dev/null
++++ b/f2fs_utils/Makefile
+@@ -0,0 +1,80 @@
++# Tools
++
++CC = gcc
++CPP = g++
++AR = ar
++
++# Project
++
++NAME = libf2fs.a
++
++# Directories
++
++BUILD ?= build
++INSTALL ?= ../../install
++
++# Sources
++
++SOURCES_C = f2fs_utils.c \
++	f2fs_ioutils.c \
++	f2fs_dlutils.c
++SOURCES_CPP =
++OBJECTS_C = $(SOURCES_C:.c=.o)
++OBJECTS_CPP = $(SOURCES_CPP:.cpp=.o)
++DEPS = $(SOURCES_C:.c=.d) $(SOURCES_CPP:.cpp=.d)
++
++# Compiler
++
++CFLAGS = -I. -I../../f2fs-tools/include -I../../f2fs-tools/mkfs -I../../core/libsparse/include -I../../selinux/libselinux/include
++
++# Produced files
++
++BUILD_OBJECTS_C = $(addprefix $(BUILD)/,$(OBJECTS_C))
++BUILD_OBJECTS_CPP = $(addprefix $(BUILD)/,$(OBJECTS_CPP))
++BUILD_OBJECTS = $(BUILD_OBJECTS_C) $(BUILD_OBJECTS_CPP)
++BUILD_DEPS = $(addprefix $(BUILD)/,$(DEPS))
++BUILD_BINARY = $(BUILD)/$(NAME)
++BUILD_DIRS = $(sort $(dir $(BUILD_BINARY) $(BUILD_OBJECTS)))
++
++INSTALL_BINARY = $(INSTALL)/$(NAME)
++INSTALL_DIRS = $(sort $(dir $(INSTALL_BINARY)))
++
++all: $(BUILD_BINARY)
++
++$(BUILD_DIRS):
++	@mkdir -p $@
++
++$(BUILD_OBJECTS_C): $(BUILD)/%.o: %.c | $(BUILD_DIRS)
++	@echo " CC	 $<"
++	@$(CC) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_OBJECTS_CPP): $(BUILD)/%.o: %.cpp | $(BUILD_DIRS)
++	@echo " CPP	 $<"
++	@$(CPP) $(CFLAGS) -MMD -MF $(BUILD)/$*.d -c $< -o $@
++
++$(BUILD_BINARY): $(BUILD_OBJECTS)
++	@echo " AR	 $@"
++	@$(AR) rcs $@ $(BUILD_OBJECTS)
++
++$(INSTALL_DIRS):
++	@mkdir -p $@
++
++$(INSTALL_BINARY): $(BUILD_BINARY) | $(INSTALL_DIRS)
++	@echo " INSTALL $@"
++	@cp $< $@
++
++.PHONY: install
++install: $(INSTALL_BINARY)
++
++.PHONY: clean
++clean:
++	@echo " CLEAN"
++	@rm -rf $(BUILD)
++
++.PHONY: distclean
++distclean: clean
++	@echo " DISTCLEAN"
++	@rm -rf $(INSTALL_BINARY)
++
++
++-include $(BUILD_DEPS)
+-- 
+2.18.0
+

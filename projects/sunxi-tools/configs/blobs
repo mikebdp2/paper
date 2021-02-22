@@ -1,0 +1,7 @@
+bin/fel-pio.bin
+bin/fel-pio.nm
+bin/fel-sdboot.sunxi
+bin/jtag-loop.sunxi
+bin/ramboot.scr
+bin/ramboot.uboot-sh
+bin/uart0-helloworld-sdboot.sunxi

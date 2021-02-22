@@ -1,0 +1,382 @@
+# Paper
+
+## About
+
+Paper is the build system component of Origami-Paper, a project that provides
+means to ease the development, preparation and installation of free software and
+logic configuration projects related to hardware support.
+
+Paper is free software: it is released under the GNU GPL version 3 or later.
+It only supports free software and logic configuration projects and does not
+distribute, document or otherwise encourage the use of non-free software and
+logic configuration. Projects supported by Paper are adapted to meet these
+requirements.
+
+The project is focused on supporting devices that can run with free boot
+software and are usable with free software drivers, although this support might
+be work in progress. Other devices may also receive support, limited to free
+software and logic configuration projects.
+
+Origami-Paper is an affiliated project of the Embedded Freedom initiative.
+
+## Resources
+
+Various online resources related to Origami-Paper are available:
+* Website: <https://projects.embedded-freedom.org/projects/origami-paper/>
+* Wiki: <https://wiki.embedded-freedom.org/wiki/Origami-Paper>
+* Mailing list: <origami-paper@lists.embedded-freedom.org>
+* IRC: #origami-paper channel on the freenode IRC network
+
+Instructions for deploying Origami-Paper on supported devices are available on
+the project's wiki.
+
+## Versions
+
+Paper comes in two distinct versions, separated in two branches:
+
+* master: contains the latest development revisions of projects and is suitable
+  for development purposes;
+* stable: contains only stable and tested revisions of projects and is suitable
+  for release and daily use.
+
+Development happens on the master branch, from which specific commits are
+cherry-picked to the stable branch.
+
+## Host Support
+
+Paper supports hosts running GNU/Linux systems with the latest versions of the
+libraries and programs available, for the following architectures:
+
+* x86
+* x86_64
+* ARMv7
+* ARMv8
+
+No support is provided for other systems and architectures, although maintaining
+compatibility with more systems and architectures is desirable.
+
+## Maintenance
+
+Each aspect of the build system (including libraries, projects and tools) is
+maintained by one or more maintainers, that are listed in the MAINTAINERS file.
+It follows the Linux kernel's description of section entries.
+
+In addition, support for each specific device in projects is maintained by one
+or more maintainers. Device maintainers are expected to test stable revisions on
+the devices they support before they can be merged to the stable branch.
+
+When introducing a new aspect to the build system, one or more maintainers have
+to be designated and listed in the MAINTAINERS file.
+
+## Contributions
+
+### Coding Style
+
+The coding style of the build system is expected to be kept consistent across
+the project. Changes made to the coding style have to be motivated and applied
+to the whole build system.
+
+The build system is written in bash, not in POSIX shell and is not intended to
+be converted to it.
+
+### Change Proposal
+
+Changes to the paper build system can be submitted and integrated to its source
+tree after a code review process.
+
+These changes should be submitted as email-formatted git patches to
+paper@lists.embedded-freedom.org with the maintainers concerned by the change
+added in copy. The code review then takes places publicly on the mailing list.
+
+A Signed-Off-By line is required for each proposed change, as a way to approve
+the Developer Certificate of Origin <https://developercertificate.org/>.
+
+## Concepts
+
+### Projects
+
+Paper abstracts each project's build system and exposes actions for each
+target project, that may be qualified with project-specific targets.
+
+Generic actions provide basic steps for each project:
+
+* usage: show information about available actions and arguments;
+* download: download the source repository;
+* extract: extract the source archive;
+* update: update the source files;
+* build: build source files;
+* install: install built files;
+* release: release installed files;
+* clean: clean built, installed and released files.
+
+Virtual actions provide meta-actions for each project:
+
+* sources: either extract or download source files;
+* cook: build source files and install built files;
+* produce: build source files, install build files and release installed files;
+* test: execute all generic actions.
+
+Specific actions may be provided by each project and can be listed with the
+usage action.
+
+### Tools
+
+Paper also includes various tools that help dealing with specific aspects of the
+build system, such as maintenance or repetitive tasks. Just like projects, they
+also expose actions, that may be qualified with tool-specific targets.
+
+Generic actions provide basic steps for each tool:
+
+* usage: show information about available actions and arguments;
+* update: update the source repository;
+* execute: execute the associated task.
+
+Specific actions may be provided by each tool and can be listed with the usage
+action.
+
+## Execution
+
+The build system is executed by calling the main script (paper) as such:
+paper [action] [target] [arguments]
+
+The target matches a project or tool and its targets are specified as arguments.
+The main script returns a non-zero return code when an error occurred and a zero
+return code when the action was successful.
+
+When the target is invalid (or missing) or its arguments are invalid, the
+general usage of the build system is shown. It contains available actions and
+targets as well as configuration-related information.
+
+When the target is valid but its arguments are not fully qualified, the action
+is iterated with all the available arguments. The special default target
+prevents the iteration of all the available arguments.
+
+## Configuration
+
+The behaviour of the build system can be configured through environment
+variables, that are listed in the general usage of the build system.
+
+These environment variables can be configured through the paper.conf
+configuration file, that is automatically sourced by the build system.
+
+## Actions Checks
+
+For each generic and specific action of a project or tool, a check may be active
+to verify whether the requested action action was already completed and skip its
+execution if that is the case. This avoids attempting to rebuild dependencies
+each time they are needed.
+
+The PROJECTS_NOCHECKS and TOOLS_NOCHECKS environment variables allow listing
+projects and tools to bypass check verifications for. Actions will be executed
+regardless of whether they have already been completed.
+
+## Directories
+
+The build system is separated in various directories:
+
+* build: built project files;
+* install: installed project files;
+* lib: build system libraries;
+* projects: projects scripts and resources;
+* release: released project files;
+* sources: project source files;
+* tools: tools scripts and resources.
+
+The build, release and sources directories may be created at run-time by the
+build system.
+
+## Source Files
+
+The source files for each project can either be downloaded from the Internet or
+extracted from a released source archive. In both cases, they can be updated to
+newer versions subsequently.
+
+In order to be automatically extracted or updated, source archives have to be
+placed in the sources directory, along with their checksum and signature files.
+The extract or update actions can then be executed for each associated project
+and target.
+
+## Features
+
+### Rules
+
+The rules implementing actions for each project or tool target are located in a
+directory named after the target, in the projects or tools directory.
+
+These rules are executable bash scripts named after the target. They contain
+a dedicated function for each of the supported actions, that is named after it.
+
+Various helpers functions are provided by the libraries to help integrate with
+the build system and reduce duplication in the rules. Various examples of these
+are provided in the existing project and tool rules.
+
+### Helpers
+
+Each project or tool may also include a dedicated helper script, named after the
+project or tool with a -helper suffix, that will automatically be sourced by the
+build system. It may contain helper functions for routines or retrieving
+configuration values.
+
+Functions in helper scripts are expected to be prefixed with the name of the
+project or tool they are associated with.
+
+### Targets
+
+Targets are configured in the configs directory of the project, with a dedicated
+targets file that specifies one target per line. Targets may include specific
+configuration in a dedicated sub-directory named after the target and specify
+sub-targets the same way.
+
+Configuration may also be provided directly in the configs directory, without
+specifying any target for the project.
+
+Each target directory will be browsed recursively by the projects library of the
+build system to determine the configuration files to use, giving the priority to
+the most qualified sub-targets.
+
+### Git Support
+
+#### Rules
+
+The projects helper library includes various helper functions for using git with
+projects, in each of the projects rules. Various functions (and associated
+checks) are available for each action :
+
+* project_download_git: download sources from git URLs;
+* project_update_git: update sources from git;
+* project_release_sources_git: release sources from git.
+
+Various examples of git support are provided in the existing project rules.
+
+#### Branches
+
+Project that use a git repository as source may specify the revision in targets
+configuration as a git hash, branch or tag name (with the right prefixes) in a
+revision configuration file.
+
+Branches for all targets that specify a revision will be created in the source
+repository during the execution of the download and update actions.
+They are named after each target, concatenated with a - sign and prefixed with
+the project name.
+
+Projects may specify another project's repository as its sources, by specifying
+this project as repository in calls to the library helpers.
+
+Specific targets may also specify another target as their branch, so that they
+may inherit the proper configuration and use shared code, by writing the fully
+qualified target name, concatenated with a - sign, in a branch file.
+
+#### Patches
+
+Patches for each target may be installed in the patches directory, following the
+same directory structure as targets, in order to determine which branch to apply
+the patches to. Patches are applied recursively from the most qualified target
+directory to the patches directory.
+
+#### Blobs Removal
+
+Each project may specify a list of blob files to remove from the source
+directory and commit with git, through the blobs configuration file.
+
+The list of blob files is read recursively from the most qualified target
+directory to the patches directory.
+
+New blobs may be discovered by executing the blobs-discover tool, that will
+produce a blobs-discover file in the configuration directory of the specified
+target. An additional blobs-ignore file indicates which blobs to ignore when
+detecting new blobs with the blobs-discover tool.
+
+Discovered new blobs may be verified with the verify action of the
+blobs-discover tool, so that they are marked either as blobs or ignored.
+The list of ignored and blob files can be tidied up after updating the revision
+of a project with the tidy action.
+
+### Dependencies
+
+Project and tools may call actions for other projects and tools directly, using
+dedicated helper functions project_action and tool_action.
+
+Checks are applied to the actions, so that they may be used directly to specify
+build-time dependencies to other projects.
+
+### Kconfig Support
+
+Some projects have integrated Kconfig support, when its sources use Kconfig
+along with a GNU make interface and a defconfig stored in configuration files.
+
+Projects with Kconfig support may implement the following standardized actions:
+
+* config: configure the build with the configuration defconfig;
+* menuconfig: configure the build with a graphical menu;
+* defconfig: generate defconfig from the build configuration and diff;
+* image: build image with the current build configuration.
+
+Projects may additionally implement specific Kconfig actions to suit their
+needs.
+
+Various examples of Kconfig support are provided in the existing project rules.
+
+### Installation
+
+Installation files, either built or static, can be installed from the install
+function in the project script with the project_install function helper.
+
+#### Built Files
+
+The files to install from the build directory are listed in an install file
+placed in the configuration directory for the appropriate target. The install
+files are read recursively from the most qualified target directory to the
+configuration directory.
+
+The installation rules are specified with the built file and its destination
+path in the installation directory separated by a semicolon, such as:
+output/output.bin:image.img
+
+#### Static Files
+
+Static files for each target are stored under an association directory structure
+in the install directory of the project directory. The list of files to install
+are listed in an install file placed in the associated directory for the
+appropriate target. The install files are read recursively from the most
+qualified target directory to the install directory.
+
+The installation rules are specified with the static file and its destination
+path in the installation directory separated by a semicolon, such as:
+configuration.txt:boot.cfg
+
+### Releases
+
+Installed and source files can be released to an archive, that is created
+reproducibly, in order to distribute product, intermediate and source forms
+for the digital technology covered by the project.
+
+Installed files can be released with a call to the
+project_release_install_archive helper in the release function of the project
+script.
+
+Specific files may be created in the source directory for the purpose of
+releasing metadata with the project. The following files are concerned:
+
+* .tarfiles: list of files to include in the release archive;
+* .epoch: source date epoch to use for building;
+* .version: version of the project;
+* .revision: git revision of the source.
+
+Checksums for the created release archives are generated, as well as detached
+GPG signatures if the RELEASE_KEY environment variable is set.
+
+### Meta-Projects
+
+Specific projects may specify other projects as recipients of their own actions,
+allowing to create groups of projects that are treated as a batch.
+
+This behaviour is implemented with the project_action_projects helper function.
+
+### Reproducible Builds
+
+Paper aims to support reproducible builds in all its supported projects,
+although this is not presently the case. Projects may be patched to achieve
+build reproducibility.
+
+Guidelines and instructions to assist in the process of making projects
+reproducible are available at: <https://reproducible-builds.org/docs/>

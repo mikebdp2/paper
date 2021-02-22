@@ -1,0 +1,252 @@
+#!/bin/bash
+
+# Copyright (C) 2016 Paul Kocialkowski <contact@paulk.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+arguments() {
+	local project=$1
+
+	if [ -z "$project" ]
+	then
+		ls -A "$root/$PROJECTS/" | while read project
+		do
+			echo "$project"
+		done
+	else
+		shift
+		project_action_helper "arguments" "$project" "$@"
+	fi
+}
+
+usage() {
+	tool_usage_actions "$tool" "verify" "tidy"
+	tool_usage_arguments "$tool" "$@"
+}
+
+update() {
+	local tool_path=$( tool_path "$tool" )
+	local sources_path=$( tool_sources_path "$tool" )
+	local deblob_check_path="$sources_path/deblob-check"
+	local patches_path="$tool_path/$PATCHES/$WILDDOTPATCH"
+
+	wget "https://www.fsfla.org/svn/fsfla/software/linux-libre/scripts/deblob-check" -O "$deblob_check_path"
+	perl -0777 -i -pe "s/  blobna \(\) \{[^\}]*\}/  blobna () \{\n    true\n  \}/" "$deblob_check_path"
+	perl -0777 -i -pe "s/  blobname \(\) \{[^\}]*\}/  blobname () \{\n    true\n  \}/" "$deblob_check_path"
+	chmod a+x "$deblob_check_path"
+
+	cd "$sources_path"
+
+	path_wildcard_expand "$patches_path" | while read patch_path
+	do
+		if ! [ -f "$patch_path" ]
+		then
+			continue
+		fi
+
+		patch -p1 < "$patch_path"
+	done
+}
+
+tidy() {
+	local project=$1
+	shift
+
+	# This assumes that the repository is the project, which is not always the case.
+	local repository=$project
+
+	project_sources_directory_missing_empty_error "$project" "$repository"
+
+	local project_sources_path=$( project_sources_path "$project" "$project" "$@" )
+	local project_blobs_path=$( project_blobs_path "$project" "$@" )
+	local project_blobs_ignore_path=$( project_blobs_ignore_path "$project" "$@" )
+	local files
+
+	if git_project_check "$repository"
+	then
+		git_project_fetch "$project" "$repository" "$@"
+		git_project_prepare_clean "$project" "$repository" "$@"
+		git_project_prepare_revision "$project" "$repository" "$@"
+	fi
+
+	if [ -f "$project_blobs_path" ]
+	then
+		files=$( cat "$project_blobs_path" )
+
+		echo "$files" | while read file
+		do
+			if ! [ -f "$project_sources_path/$file" ]
+			then
+				printf "Removing $file from the blobs list\n"
+				sed "\|^$file$|d" -i "$project_blobs_path"
+			fi
+		done
+	fi
+
+	if [ -f "$project_blobs_ignore_path" ]
+	then
+		files=$( cat "$project_blobs_ignore_path" )
+
+		echo "$files" | while read file
+		do
+			if ! [ -f "$project_sources_path/$file" ]
+			then
+				printf "Removing $file from the blobs ignore list\n"
+				sed "\|^$file$|d" -i "$project_blobs_ignore_path"
+			fi
+		done
+	fi
+}
+
+verify() {
+	local project=$1
+	shift
+
+	# This assumes that the repository is the project, which is not always the case.
+	local repository=$project
+
+	project_sources_directory_missing_empty_error "$project" "$repository"
+
+	local project_path=$( project_path "$project" )
+	local project_sources_path=$( project_sources_path "$project" "$repository" "$@" )
+	local project_blobs_path=$( project_blobs_path "$project" "$@" )
+	local project_blobs_ignore_path=$( project_blobs_ignore_path "$project" "$@" )
+	local project_blobs_discover_path=$( project_blobs_discover_path "$project" "$@" )
+
+	local file
+	local choice
+	local test
+
+	requirements "sort"
+
+	file_exists_check "$project_blobs_discover_path"
+
+	if git_project_check "$repository"
+	then
+		git_project_checkout "$project" "$repository" "$@"
+		git_clean "$project_sources_path"
+	fi
+
+	IFS=$'\n'
+
+	for file in $( cat "$project_blobs_discover_path" )
+	do
+		(
+			unset IFS
+
+			test=$( grep -P "^$file$" "$project_blobs_path" || true )
+			if [ -n "$test" ]
+			then
+				printf "\nSkipping known blob: $file\n"
+
+				sed "\|^$file$|d" -i "$project_blobs_discover_path"
+				continue
+			fi
+
+			printf "\nDiscovered blob: $file\n"
+
+			$EDITOR "$project_sources_path/$file"
+
+			printf "Type \"blob\" to list as blob or press enter to discard: "
+			read choice
+
+			if [ "$choice" = "blob" ]
+			then
+				echo "$file" >> "$project_blobs_path"
+			else
+				echo "$file" >> "$project_blobs_ignore_path"
+			fi
+
+			sed "\|^$file$|d" -i "$project_blobs_discover_path"
+		) < /dev/tty
+	done
+
+	unset IFS
+
+	rm "$project_blobs_discover_path"
+
+	sort -o "$project_blobs_path" "$project_blobs_path"
+	sort -o "$project_blobs_ignore_path" "$project_blobs_ignore_path"
+}
+
+execute() {
+	local project=$1
+	shift
+
+	# This assumes that the repository is the project, which is not always the case.
+	local repository=$project
+
+	project_sources_directory_missing_empty_error "$project" "$repository"
+
+	local sources_path=$( tool_sources_path "$tool" )
+	local project_path=$( project_path "$project" )
+	local project_sources_path=$( project_sources_path "$project" "$repository" "$@" )
+	local project_blobs_path=$( project_blobs_path "$project" "$@" )
+	local project_blobs_ignore_path=$( project_blobs_ignore_path "$project" "$@" )
+	local project_blobs_discover_path=$( project_blobs_discover_path "$project" "$@" )
+	local project_blobs_directory_path
+
+	requirements "sort"
+
+	local deblob_check_path="$sources_path/deblob-check"
+
+	if git_project_check "$repository"
+	then
+		git_project_fetch "$project" "$repository" "$@"
+		git_project_prepare_clean "$project" "$repository" "$@"
+		git_project_prepare_revision "$project" "$repository" "$@"
+	fi
+
+	printf "\nDiscovering new blobs, this may take a while...\n"
+
+	files=$( find "$project_sources_path" -type f | grep -vP "\.git/|\.tar|\.patch" )
+
+	touch "$project_blobs_discover_path"
+
+	echo "$files" | while read file
+	do
+		file_match=$( echo "$file" | sed "s,^$project_sources_path/,,g" )
+
+		if [ -n "$project_blobs_ignore_path" ] && [ -f "$project_blobs_ignore_path" ]
+		then
+			match=$( grep "$file_match" "$project_blobs_ignore_path" || true)
+			if [ -n "$match" ]
+			then
+				continue
+			fi
+		fi
+
+		match=$( "$deblob_check_path" --use-awk -l -i "" "$file" || true )
+		if [ -n "$match" ]
+		then
+			echo "$file_match" >> "$project_blobs_discover_path"
+		fi
+	done
+
+	sort -o "$project_blobs_discover_path" "$project_blobs_discover_path"
+
+	printf "\nDiscovered blobs were stored in $project_blobs_discover_path\n"
+}
+
+execute_check() {
+	local project=$1
+	shift
+
+	local project_path=$( project_path "$project" )
+	local project_blobs_path=$( project_blobs_path "$project" "$@" )
+	local project_blobs_ignore_path=$( project_blobs_ignore_path "$project" "$@" )
+	local project_blobs_discover_path=$( project_blobs_discover_path "$project" "$@" )
+
+	file_exists_check "$project_blobs_discover_path"
+}
